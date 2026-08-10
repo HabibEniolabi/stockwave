@@ -23,7 +23,8 @@ export type AppIconName =
   | 'back'
   | 'visibilityOff'
   | 'faceId'
-  | 'fingerprint';
+  | 'fingerprint'
+  | 'checkmark';
 
 interface AppIconProps {
   name: AppIconName;
@@ -103,6 +104,10 @@ const icons: Record<
   faceId: {
     default: 'finger-print-outline',
     focused: 'finger-print'
+  },
+  checkmark: {
+    default: 'checkmark-circle-outline',
+    focused: 'checkmark-circle'
   }
 };
 

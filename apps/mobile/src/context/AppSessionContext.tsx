@@ -1,9 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 type AppSessionContextValue = {
   isAuthenticated: boolean;
@@ -25,38 +20,44 @@ type AppSessionContextValue = {
   completePinSetup: () => void;
 
   resetSession: () => void;
+
+  resetPasswordEmail: string;
+  resetPasswordCode: string;
+  resetPasswordVerified: boolean;
+
+  startPasswordReset: (email: string) => void;
+  setResetPasswordCode: (code: string) => void;
+  verifyPasswordResetCode: () => void;
+  completePasswordReset: () => void;
 };
 
-const AppSessionContext = createContext<
-  AppSessionContextValue | undefined
->(undefined);
+const AppSessionContext = createContext<AppSessionContextValue | undefined>(
+  undefined,
+);
 
 type AppSessionProviderProps = {
   children: ReactNode;
 };
 
-export function AppSessionProvider({
-  children,
-}: AppSessionProviderProps) {
-  const [isAuthenticated, setIsAuthenticated] =
+export function AppSessionProvider({ children }: AppSessionProviderProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
+
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  const [biometricPromptDismissed, setBiometricPromptDismissed] =
     useState(false);
 
-  const [isPhoneVerified, setIsPhoneVerified] =
-    useState(false);
+  const [pinCreated, setPinCreated] = useState(false);
 
-  const [hasSeenWelcome, setHasSeenWelcome] =
-    useState(false);
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('');
 
-  const [biometricEnabled, setBiometricEnabled] =
-    useState(false);
+  const [resetPasswordCode, setResetPasswordCode] = useState('');
 
-  const [
-    biometricPromptDismissed,
-    setBiometricPromptDismissed,
-  ] = useState(false);
-
-  const [pinCreated, setPinCreated] =
-    useState(false);
+  const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
 
   /**
    * Registration OTP has been successfully verified.
@@ -104,6 +105,26 @@ export function AppSessionProvider({
     setBiometricPromptDismissed(false);
 
     setPinCreated(false);
+
+    setResetPasswordEmail('');
+    setResetPasswordCode('');
+    setResetPasswordVerified(false);
+  };
+
+  const startPasswordReset = (email: string) => {
+    setResetPasswordEmail(email.trim().toLowerCase());
+    setResetPasswordCode('');
+    setResetPasswordVerified(false);
+  };
+
+  const verifyPasswordResetCode = () => {
+    setResetPasswordVerified(true);
+  };
+
+  const completePasswordReset = () => {
+    setResetPasswordEmail('');
+    setResetPasswordCode('');
+    setResetPasswordVerified(false);
   };
 
   return (
@@ -118,6 +139,10 @@ export function AppSessionProvider({
 
         pinCreated,
 
+        resetPasswordEmail,
+        resetPasswordCode,
+        resetPasswordVerified,
+
         completePhoneVerification,
         completeSignIn,
         completeWelcome,
@@ -126,6 +151,11 @@ export function AppSessionProvider({
         dismissBiometricPrompt,
 
         completePinSetup,
+
+        startPasswordReset,
+        setResetPasswordCode,
+        verifyPasswordResetCode,
+        completePasswordReset,
 
         resetSession,
       }}
@@ -139,9 +169,7 @@ export function useAppSession() {
   const context = useContext(AppSessionContext);
 
   if (!context) {
-    throw new Error(
-      'useAppSession must be used inside AppSessionProvider',
-    );
+    throw new Error('useAppSession must be used inside AppSessionProvider');
   }
 
   return context;

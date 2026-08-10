@@ -92,6 +92,48 @@ const Layout = () => {
             animation: 'fade',
           }}
         />
+         <Stack.Screen
+          name="(auth)/CreateNewPasswordScreen"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(auth)/PasswordResetSuccessScreen"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(auth)/ResetPasswordVerificationScreen"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(tabs)/home"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(tabs)/market"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(tabs)/portfolio"
+          options={{
+            animation: 'fade',
+          }}
+        />
+         <Stack.Screen
+          name="(tabs)/profile"
+          options={{
+            animation: 'fade',
+          }}
+        />
       </Stack>
     </AppSessionProvider>
   );

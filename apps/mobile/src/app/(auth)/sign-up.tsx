@@ -159,14 +159,14 @@ export default function SignUpScreen() {
                 // textContentType="newPassword"
                 onSubmitEditing={handleContinue}
                 {...Platform.select({
-    ios: {
-      textContentType: 'none' as const,
-    },
-    android: {
-      autoComplete: 'new-password' as const,
-      importantForAutofill: 'yes' as const,
-    },
-  })}
+                  ios: {
+                    textContentType: 'none' as const,
+                  },
+                  android: {
+                    autoComplete: 'new-password' as const,
+                    importantForAutofill: 'yes' as const,
+                  },
+                })}
                 returnKeyType="done"
                 onChangeText={(value) => {
                   setPassword(value);
