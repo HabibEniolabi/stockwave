@@ -150,7 +150,7 @@ export default function SignInScreen() {
               hitSlop={8}
               style={styles.forgotPasswordButton}
               onPress={() => {
-                router.push('/(auth)/CreateNewPasswordScreen');
+                router.push('/(auth)/ResetPasswordVerificationScreen');
               }}
             >
               <Text style={styles.forgotPasswordText}>Forgot password?</Text>
