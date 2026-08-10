@@ -19,6 +19,7 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
+import { useAppSession } from '../../context/AppSessionContext';
 
 const OTP_LENGTH = 6;
 const OTP_PREVIEW_DURATION = 6000;
@@ -35,6 +36,8 @@ export default function OtpVerificationScreen() {
 
   const VERIFY_DELAY = 700;
   const SUCCESS_DELAY = 900;
+
+  const { completePhoneVerification } = useAppSession();
 
   useEffect(() => {
     // Opening the modal generates a new random OTP.
@@ -115,6 +118,9 @@ export default function OtpVerificationScreen() {
       // Turn the boxes green and trigger a lighter wiggle.
       setOtpStatus('success');
       setShakeTrigger((current) => current + 1);
+
+      //Update dumpy aplication statw
+      completePhoneVerification();
 
       // Keep the success state visible before navigating.
       setTimeout(() => {

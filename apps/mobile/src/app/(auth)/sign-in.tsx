@@ -18,9 +18,8 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import Apple from '../../assets/icons/Apple';
-import Google from '../../assets/icons/Google';
 import { SocialSignIn } from '../../components/ui/SocianSignin';
+import { useAppSession } from '../../context/AppSessionContext';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -28,6 +27,8 @@ export default function SignInScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  const { completeSignIn } = useAppSession();
 
   const handleSignIn = () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -54,6 +55,8 @@ export default function SignInScreen() {
       setPasswordError('Password must be at least 8 characters.');
       return;
     }
+
+    completeSignIn();
 
     console.log({
       email: normalizedEmail,

@@ -10,6 +10,7 @@ import {
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
 import { useFonts } from 'expo-font';
+import { AppSessionProvider } from '../context/AppSessionContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,7 +41,7 @@ const Layout = () => {
     return null;
   }
   return (
-    <>
+    <AppSessionProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen
@@ -92,7 +93,7 @@ const Layout = () => {
           }}
         />
       </Stack>
-    </>
+    </AppSessionProvider>
   );
 };
 

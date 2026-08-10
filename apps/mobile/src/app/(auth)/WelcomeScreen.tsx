@@ -8,8 +8,18 @@ import { colors } from '../../theme/colors';
 import { getTypography } from '../../theme/typography';
 import { ConfettiAnimation } from '../../components/animations/ConfettiAnimation';
 import { StockWaveSuccessMark } from '../../components/branding/StockWaveSuccessMark';
+import { useAppSession } from '../../context/AppSessionContext';
 
 export default function WelcomeScreen() {
+  const {
+    completeWelcome,
+  } = useAppSession();
+
+  const handleContinue = () => {
+    completeWelcome();
+
+    router.replace('/(tabs)/home');
+  };
   return (
     <SafeAreaView style={styles.safeArea}>
       <SuccessInfo
@@ -25,9 +35,7 @@ export default function WelcomeScreen() {
           <Button
             title="I’m ready to start!"
             variant="primary"
-            onPress={() => {
-              router.replace('/(auth)/BiometricSetupScreen');
-            }}
+            onPress={handleContinue}
           />
         }
       />
