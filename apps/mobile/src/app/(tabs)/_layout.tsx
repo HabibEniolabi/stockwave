@@ -1,13 +1,13 @@
-import {
-  Redirect,
-  Tabs,
-} from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { AppIcon } from
-  '../../components/icons/AppIcon';
+import HomeTabIcon from '../../assets/icons/HomeTabIcon';
+import PortfolioTabIcon  from '../../assets/icons/PortfolioTabIcon';
+import SwapTabIcon  from '../../assets/icons/SwapTabIcon';
+import MarketTabIcon  from '../../assets/icons/MarketTabIcon';
+import ProfileTabIcon  from '../../assets/icons/ProfileTabIcon';
 
-import { useAppSession } from
-  '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 
@@ -18,9 +18,7 @@ export default function TabsLayout() {
   } = useAppSession();
 
   if (!isAuthenticated) {
-    return (
-      <Redirect href="/(auth)/sign-in" />
-    );
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
   if (!hasSeenWelcome) {
@@ -34,25 +32,30 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
 
+        tabBarShowLabel: false,
+
         tabBarActiveTintColor:
-          colors.primary[100],
+          colors.neutral[800],
 
         tabBarInactiveTintColor:
           colors.neutral[400],
+
+        tabBarStyle: styles.tabBar,
+
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          // title: 'Home',
+
           tabBarIcon: ({
             color,
-            focused,
           }) => (
-            <AppIcon
-              name="home"
+            <HomeTabIcon
+              size={28}
               color={color}
-              focused={focused}
             />
           ),
         }}
@@ -61,16 +64,31 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="portfolio"
         options={{
-          title: 'Portfolio',
+          // title: 'Portfolio',
+
           tabBarIcon: ({
             color,
-            focused,
           }) => (
-            <AppIcon
-              name="portfolio"
+            <PortfolioTabIcon
+              size={28}
               color={color}
-              focused={focused}
             />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="swap"
+        options={{
+          // title: 'Swap',
+
+          tabBarIcon: () => (
+            <View style={styles.swapButton}>
+              <SwapTabIcon
+                size={32}
+                color={colors.other.white}
+              />
+            </View>
           ),
         }}
       />
@@ -78,15 +96,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="market"
         options={{
-          title: 'Market',
+          // title: 'Market',
+
           tabBarIcon: ({
             color,
-            focused,
           }) => (
-            <AppIcon
-              name="market"
+            <MarketTabIcon
+              size={28}
               color={color}
-              focused={focused}
             />
           ),
         }}
@@ -95,15 +112,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          // title: 'Profile',
+
           tabBarIcon: ({
             color,
-            focused,
           }) => (
-            <AppIcon
-              name="profile"
+            <ProfileTabIcon
+              size={28}
               color={color}
-              focused={focused}
             />
           ),
         }}
@@ -111,3 +127,34 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    height: 88,
+
+    paddingTop: 10,
+    paddingBottom: 18,
+
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[50],
+
+    backgroundColor: colors.other.white,
+  },
+
+  tabBarItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  swapButton: {
+    width: 64,
+    height: 64,
+
+    borderRadius: 32,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: colors.primary[100],
+  },
+});

@@ -31,6 +31,7 @@ interface AppIconProps {
   size?: number;
   color?: string;
   focused?: boolean;
+  backgroundColor?: string;
 }
 
 const icons: Record<
