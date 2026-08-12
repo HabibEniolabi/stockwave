@@ -134,6 +134,12 @@ const Layout = () => {
             animation: 'fade',
           }}
         />
+         <Stack.Screen
+          name="(tabs)/swap"
+          options={{
+            animation: 'fade',
+          }}
+        />
       </Stack>
     </AppSessionProvider>
   );

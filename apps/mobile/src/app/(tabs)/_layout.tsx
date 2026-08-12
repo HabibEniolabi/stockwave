@@ -2,10 +2,10 @@ import { Redirect, Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import HomeTabIcon from '../../assets/icons/HomeTabIcon';
-import PortfolioTabIcon  from '../../assets/icons/PortfolioTabIcon';
-import SwapTabIcon  from '../../assets/icons/SwapTabIcon';
-import MarketTabIcon  from '../../assets/icons/MarketTabIcon';
-import ProfileTabIcon  from '../../assets/icons/ProfileTabIcon';
+import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
+import SwapTabIcon from '../../assets/icons/SwapTabIcon';
+import MarketTabIcon from '../../assets/icons/MarketTabIcon';
+import ProfileTabIcon from '../../assets/icons/ProfileTabIcon';
 
 import { useAppSession } from '../../context/AppSessionContext';
 
@@ -18,7 +18,9 @@ export default function TabsLayout() {
   } = useAppSession();
 
   if (!isAuthenticated) {
-    return <Redirect href="/(auth)/sign-in" />;
+    return (
+      <Redirect href="/(auth)/sign-in" />
+    );
   }
 
   if (!hasSeenWelcome) {
@@ -36,26 +38,27 @@ export default function TabsLayout() {
 
         tabBarActiveTintColor:
           colors.neutral[800],
-
         tabBarInactiveTintColor:
           colors.neutral[400],
 
         tabBarStyle: styles.tabBar,
-
         tabBarItemStyle: styles.tabBarItem,
+        tabBarIconStyle: styles.tabBarIcon,
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          // title: 'Home',
+          title: 'Home',
 
           tabBarIcon: ({
             color,
+            focused,
           }) => (
             <HomeTabIcon
-              size={28}
+              size={30}
               color={color}
+              focused={focused}
             />
           ),
         }}
@@ -64,14 +67,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="portfolio"
         options={{
-          // title: 'Portfolio',
+          title: 'Portfolio',
 
           tabBarIcon: ({
             color,
+            focused,
           }) => (
             <PortfolioTabIcon
-              size={28}
+              size={30}
               color={color}
+              focused={focused}
             />
           ),
         }}
@@ -80,10 +85,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="swap"
         options={{
-          // title: 'Swap',
+          title: 'Swap',
 
-          tabBarIcon: () => (
-            <View style={styles.swapButton}>
+          tabBarIcon: ({ focused }) => (
+            <View
+              style={[
+                styles.swapButton,
+                focused &&
+                  styles.swapButtonFocused,
+              ]}
+            >
               <SwapTabIcon
                 size={32}
                 color={colors.other.white}
@@ -96,14 +107,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="market"
         options={{
-          // title: 'Market',
+          title: 'Market',
 
           tabBarIcon: ({
             color,
+            focused,
           }) => (
             <MarketTabIcon
-              size={28}
+              size={30}
               color={color}
+              focused={focused}
             />
           ),
         }}
@@ -112,14 +125,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          // title: 'Profile',
+          title: 'Profile',
 
           tabBarIcon: ({
             color,
+            focused,
           }) => (
             <ProfileTabIcon
-              size={28}
+              size={30}
               color={color}
+              focused={focused}
             />
           ),
         }}
@@ -130,31 +145,43 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 88,
+    height: 87,
 
-    paddingTop: 10,
-    paddingBottom: 18,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 22,
 
     borderTopWidth: 1,
     borderTopColor: colors.neutral[50],
 
     backgroundColor: colors.other.white,
+
+    overflow: 'visible',
   },
 
   tabBarItem: {
     alignItems: 'center',
     justifyContent: 'center',
+
+    paddingHorizontal: 0,
+  },
+
+  tabBarIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   swapButton: {
-    width: 64,
-    height: 64,
+    width: 40,
+    height: 40,
 
-    borderRadius: 32,
+    borderRadius: 20,
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    backgroundColor: colors.primary[100],
+    backgroundColor: colors.primary[100]
   },
 });
