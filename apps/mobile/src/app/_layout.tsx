@@ -44,7 +44,7 @@ const Layout = () => {
     <AppSessionProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen
+        {/* <Stack.Screen
           name="index"
           options={{
             animation: 'fade',
@@ -140,6 +140,15 @@ const Layout = () => {
             animation: 'fade',
           }}
         />
+         <Stack.Screen
+          name="(security)/CreatePinScreen"
+          options={{
+            animation: 'fade',
+          }}
+        /> */}
+        <Stack.Screen name="(auth)" />
+  <Stack.Screen name="(tabs)" />
+  <Stack.Screen name="(security)" />
       </Stack>
     </AppSessionProvider>
   );

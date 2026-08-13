@@ -87,12 +87,10 @@ export default function TabsLayout() {
         options={{
           title: 'Swap',
 
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: () => (
             <View
               style={[
                 styles.swapButton,
-                focused &&
-                  styles.swapButtonFocused,
               ]}
             >
               <SwapTabIcon

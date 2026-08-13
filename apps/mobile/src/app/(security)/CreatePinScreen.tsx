@@ -1,36 +1,27 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from
-  'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { OtpInput } from
-  '../../components/form/OtpInput';
-import { BackButton } from
-  '../../components/ui/BackButton';
-import { Button } from
-  '../../components/ui/Button';
+import { OtpInput } from '../../components/form/OtpInput';
+import { BackButton } from '../../components/ui/BackButton';
+import { Button } from '../../components/ui/Button';
 
-import { useAppSession } from
-  '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { getTypography } from
-  '../../theme/typography';
+import { getTypography } from '../../theme/typography';
 
-const PIN_LENGTH = 4;
+const PIN_LENGTH = 6;
 
 export default function CreatePinScreen() {
   const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [confirmationPin, setConfirmationPin] = useState('');
+  const [step, setStep] = useState<'create' | 'confirm'>('create');
 
-  const {
-    completePinSetup,
-  } = useAppSession();
+  const { completePinSetup } = useAppSession();
 
   const handleCreatePin = () => {
     if (pin.length !== PIN_LENGTH) {
@@ -45,21 +36,27 @@ export default function CreatePinScreen() {
     router.replace('/(tabs)/home');
   };
 
+  const handleBack = () => {
+    if (step === 'confirm') {
+      setStep('create');
+      setConfirmationPin('');
+      setError('');
+      return;
+    }
+
+    router.replace('/(tabs)/home');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <BackButton
-          onPress={() => router.back()}
-        />
+        <BackButton onPress={handleBack} />
 
         <View style={styles.content}>
-          <Text style={styles.title}>
-            Create New PIN
-          </Text>
+          <Text style={styles.title}>Create New PIN</Text>
 
           <Text style={styles.description}>
-            Adding a PIN will make your
-            investment account more secure.
+            {'Adding a PIN number will make your\ninvestment secure'}
           </Text>
 
           <View style={styles.pinContainer}>
