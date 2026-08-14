@@ -15,6 +15,12 @@ export default function SecurityLayout() {
           animation: 'fade',
         }}
       />
+      <Stack.Screen
+        name="UnlockPinScreen"
+        options={{
+          animation: 'fade',
+        }}
+      />
     </Stack>
   );
 }

@@ -39,7 +39,6 @@ export function BiometricSetupModal({
 }: BiometricSetupModalProps) {
   const {
     enableBiometrics,
-    dismissBiometricPrompt,
   } = useAppSession();
 
   const [mode, setMode] =
@@ -48,8 +47,10 @@ export function BiometricSetupModal({
   const [isChecking, setIsChecking] =
     useState(true);
 
-  const [isAuthenticating, setIsAuthenticating] =
-    useState(false);
+  const [
+    isAuthenticating,
+    setIsAuthenticating,
+  ] = useState(false);
 
   const [error, setError] =
     useState('');
@@ -59,132 +60,153 @@ export function BiometricSetupModal({
       return;
     }
 
-    const detectBiometricType = async () => {
-      setIsChecking(true);
-      setError('');
+    const detectBiometricType =
+      async () => {
+        setIsChecking(true);
+        setError('');
 
-      try {
-        const hasHardware =
-          await LocalAuthentication.hasHardwareAsync();
+        try {
+          const hasHardware =
+            await LocalAuthentication
+              .hasHardwareAsync();
 
-        const enrolled =
-          await LocalAuthentication.isEnrolledAsync();
+          const enrolled =
+            await LocalAuthentication
+              .isEnrolledAsync();
 
-        if (!hasHardware || !enrolled) {
+          if (
+            !hasHardware ||
+            !enrolled
+          ) {
+            setMode('unsupported');
+            return;
+          }
+
+          const supportedTypes =
+            await LocalAuthentication
+              .supportedAuthenticationTypesAsync();
+
+          const supportsFace =
+            supportedTypes.includes(
+              LocalAuthentication
+                .AuthenticationType
+                .FACIAL_RECOGNITION,
+            );
+
+          const supportsFingerprint =
+            supportedTypes.includes(
+              LocalAuthentication
+                .AuthenticationType
+                .FINGERPRINT,
+            );
+
+          if (supportsFace) {
+            setMode('face');
+            return;
+          }
+
+          if (supportsFingerprint) {
+            setMode('fingerprint');
+            return;
+          }
+
           setMode('unsupported');
-          return;
-        }
+        } catch {
+          setMode('unsupported');
 
-        const supportedTypes =
-          await LocalAuthentication
-            .supportedAuthenticationTypesAsync();
-
-        const supportsFace =
-          supportedTypes.includes(
-            LocalAuthentication.AuthenticationType
-              .FACIAL_RECOGNITION,
+          setError(
+            'Unable to check biometric authentication.',
           );
-
-        const supportsFingerprint =
-          supportedTypes.includes(
-            LocalAuthentication.AuthenticationType
-              .FINGERPRINT,
-          );
-
-        if (supportsFace) {
-          setMode('face');
-          return;
+        } finally {
+          setIsChecking(false);
         }
-
-        if (supportsFingerprint) {
-          setMode('fingerprint');
-          return;
-        }
-
-        setMode('unsupported');
-      } catch {
-        setMode('unsupported');
-
-        setError(
-          'Unable to check biometric authentication.',
-        );
-      } finally {
-        setIsChecking(false);
-      }
-    };
+      };
 
     detectBiometricType();
   }, [visible]);
 
-  // const handleMaybeLater = () => {
-  //   dismissBiometricPrompt();
-  //   onClose();
-  // };
-
   const handleUsePinInstead = () => {
-    dismissBiometricPrompt();
     onClose();
 
-    router.replace("/CreatePinScreen")
-  } 
+    router.replace(
+      '/CreatePinScreen',
+    );
+  };
 
-  const handleEnableBiometrics = async () => {
-    if (
-      mode === 'unsupported' ||
-      isAuthenticating
-    ) {
-      return;
-    }
-
-    setIsAuthenticating(true);
-    setError('');
-
-    try {
-      const result =
-        await LocalAuthentication.authenticateAsync({
-          promptMessage:
-            mode === 'face'
-              ? 'Enable Face ID for StockWave'
-              : 'Enable fingerprint for StockWave',
-
-          cancelLabel: 'Cancel',
-
-          fallbackLabel: 'Use device passcode',
-
-          disableDeviceFallback: false,
-        });
-
-      if (!result.success) {
-        if (
-          result.error !== 'user_cancel' &&
-          result.error !== 'system_cancel'
-        ) {
-          setError(
-            'Biometric authentication was not completed.',
-          );
-        }
-
+  const handleEnableBiometrics =
+    async () => {
+      if (
+        mode === 'unsupported' ||
+        isAuthenticating
+      ) {
         return;
       }
 
-      enableBiometrics();
+      setIsAuthenticating(true);
+      setError('');
 
-      onClose();
+      try {
+        const result =
+          await LocalAuthentication
+            .authenticateAsync({
+              promptMessage:
+                mode === 'face'
+                  ? 'Enable Face ID for StockWave'
+                  : 'Enable fingerprint for StockWave',
 
-      router.push(
-        '/CreatePinScreen',
-      );
-    } catch {
-      setError(
-        'Unable to complete biometric authentication.',
-      );
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
+              cancelLabel: 'Cancel',
 
-  const isFaceId = mode === 'face';
-  const isUnSupported = mode === 'unsupported';
+              fallbackLabel:
+                'Use device passcode',
+
+              disableDeviceFallback:
+                false,
+            });
+
+        if (!result.success) {
+          if (
+            result.error !==
+              'user_cancel' &&
+            result.error !==
+              'system_cancel'
+          ) {
+            setError(
+              'Biometric authentication was not completed.',
+            );
+          }
+
+          return;
+        }
+
+        /**
+         * User successfully authenticated
+         * using the device biometric.
+         */
+        enableBiometrics();
+
+        onClose();
+
+        /**
+         * PIN is still mandatory as the
+         * fallback security method.
+         */
+        router.replace(
+          '/CreatePinScreen',
+        );
+      } catch {
+        setError(
+          'Unable to complete biometric authentication.',
+        );
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+
+  const isFaceId =
+    mode === 'face';
+
+  const isUnsupported =
+    mode === 'unsupported';
 
   return (
     <Modal
@@ -192,29 +214,59 @@ export function BiometricSetupModal({
       visible={visible}
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={handleUsePinInstead}
+      onRequestClose={
+        handleUsePinInstead
+      }
     >
       <View style={styles.overlay}>
-        <View style={StyleSheet.absoluteFill} />
+        {/*
+          Don't make this Pressable.
+
+          Security setup is mandatory,
+          so tapping the backdrop should
+          not dismiss the flow.
+        */}
+        <View
+          style={
+            StyleSheet.absoluteFill
+          }
+        />
 
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
           {isChecking ? (
-            <View style={styles.loadingContainer}>
+            <View
+              style={
+                styles.loadingContainer
+              }
+            >
               <ActivityIndicator
                 size="large"
-                color={colors.primary[100]}
+                color={
+                  colors.primary[100]
+                }
               />
 
-              <Text style={styles.loadingText}>
-                Checking device security...
+              <Text
+                style={
+                  styles.loadingText
+                }
+              >
+                Checking device
+                security...
               </Text>
             </View>
           ) : (
             <>
-              <View style={styles.content}>
-                <View style={styles.iconContainer}>
+              <View
+                style={styles.content}
+              >
+                <View
+                  style={
+                    styles.iconContainer
+                  }
+                >
                   {mode === 'face' ? (
                     <AnimatedFaceIdIcon
                       size={72}
@@ -239,31 +291,43 @@ export function BiometricSetupModal({
                   )}
                 </View>
 
-                <Text style={styles.title}>
-                  {mode === 'unsupported'
-                    ? 'Biometrics unavailable'
+                <Text
+                  style={styles.title}
+                >
+                  {isUnsupported
+                    ? 'Secure your account'
                     : isFaceId
                       ? 'Set up Face ID'
                       : 'Set up fingerprint'}
                 </Text>
 
-                <Text style={styles.description}>
-                  {mode === 'unsupported'
-                    ? 'No enrolled biometric authentication was found on this device.'
+                <Text
+                  style={
+                    styles.description
+                  }
+                >
+                  {isUnsupported
+                    ? 'Biometric authentication is unavailable on this device. Create a PIN to secure StockWave.'
                     : isFaceId
                       ? 'Use Face ID for faster and more secure access to StockWave.'
                       : 'Use your fingerprint for faster and more secure access to StockWave.'}
                 </Text>
 
                 {error ? (
-                  <Text style={styles.error}>
+                  <Text
+                    style={
+                      styles.error
+                    }
+                  >
                     {error}
                   </Text>
                 ) : null}
               </View>
 
-              <View style={styles.actions}>
-                {isUnSupported ? (
+              <View
+                style={styles.actions}
+              >
+                {isUnsupported ? (
                   <Button
                     title="Create PIN"
                     variant="primary"
@@ -322,7 +386,8 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(13, 13, 18, 0.35)',
+    backgroundColor:
+      'rgba(13, 13, 18, 0.35)',
   },
 
   sheet: {
@@ -332,7 +397,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[6],
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    backgroundColor: colors.other.white,
+    backgroundColor:
+      colors.other.white,
   },
 
   handle: {
@@ -340,7 +406,8 @@ const styles = StyleSheet.create({
     height: 5,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor: colors.neutral[100],
+    backgroundColor:
+      colors.neutral[100],
   },
 
   loadingContainer: {
@@ -351,7 +418,9 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
-    ...getTypography('bodyMedium'),
+    ...getTypography(
+      'bodyMedium',
+    ),
     color: colors.neutral[500],
   },
 
@@ -371,13 +440,18 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    ...getTypography('heading5', 'bold'),
+    ...getTypography(
+      'heading5',
+      'bold',
+    ),
     color: colors.neutral[900],
     textAlign: 'center',
   },
 
   description: {
-    ...getTypography('bodyMedium'),
+    ...getTypography(
+      'bodyMedium',
+    ),
     maxWidth: 310,
     marginTop: spacing[3],
     color: colors.neutral[500],
@@ -385,7 +459,9 @@ const styles = StyleSheet.create({
   },
 
   error: {
-    ...getTypography('bodySmall'),
+    ...getTypography(
+      'bodySmall',
+    ),
     marginTop: spacing[4],
     color: colors.error.base,
     textAlign: 'center',
@@ -402,7 +478,10 @@ const styles = StyleSheet.create({
   },
 
   laterText: {
-    ...getTypography('bodyMedium', 'semiBold'),
+    ...getTypography(
+      'bodyMedium',
+      'semiBold',
+    ),
     color: colors.neutral[500],
   },
 });

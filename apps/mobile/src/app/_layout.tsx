@@ -15,7 +15,7 @@ import { AppSessionProvider } from '../context/AppSessionContext';
 SplashScreen.preventAutoHideAsync();
 
 const Layout = () => {
-    const [fontsLoaded, fontError] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
     'Inter-SemiBold': Inter_600SemiBold,
@@ -147,8 +147,8 @@ const Layout = () => {
           }}
         /> */}
         <Stack.Screen name="(auth)" />
-  <Stack.Screen name="(tabs)" />
-  <Stack.Screen name="(security)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(security)" />
       </Stack>
     </AppSessionProvider>
   );

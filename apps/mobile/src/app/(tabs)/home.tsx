@@ -1,22 +1,15 @@
 import { useEffect, useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from
-  'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BiometricSetupModal } from
-  '../../components/modals/BiometricSetupModal';
+import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
 
-import { useAppSession } from
-  '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { getTypography } from
-  '../../theme/typography';
+import { getTypography } from '../../theme/typography';
+import { Button } from '../../components/ui/Button';
 
 export default function HomeScreen() {
   const {
@@ -24,23 +17,19 @@ export default function HomeScreen() {
     isPhoneVerified,
     hasSeenWelcome,
 
+    //Test
+    lockApp,
+
     biometricEnabled,
-    biometricPromptDismissed,
 
     pinCreated,
   } = useAppSession();
 
-  const [
-    biometricModalVisible,
-    setBiometricModalVisible,
-  ] = useState(false);
+  const [biometricModalVisible, setBiometricModalVisible] = useState(false);
 
   useEffect(() => {
     const shouldShowBiometricSetup =
-      isAuthenticated &&
-      hasSeenWelcome &&
-      !biometricEnabled &&
-      !biometricPromptDismissed;
+      isAuthenticated && hasSeenWelcome && !pinCreated;
 
     if (!shouldShowBiometricSetup) {
       return;
@@ -51,55 +40,41 @@ export default function HomeScreen() {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [
-    isAuthenticated,
-    hasSeenWelcome,
-    biometricEnabled,
-    biometricPromptDismissed,
-  ]);
+  }, [isAuthenticated, hasSeenWelcome, pinCreated]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.title}>
-          StockWave Home
-        </Text>
+        <Text style={styles.title}>StockWave Home</Text>
 
-        <Text style={styles.subtitle}>
-          Your Home UI goes here.
-        </Text>
+        <Text style={styles.subtitle}>Your Home UI goes here.</Text>
 
         {/* DEVELOPMENT ONLY */}
         <View style={styles.debugContainer}>
-          <Text style={styles.debugTitle}>
-            Dummy session
+          <Text style={styles.debugTitle}>Dummy session</Text>
+
+          <Text style={styles.debugText}>
+            Authenticated: {isAuthenticated ? 'Yes' : 'No'}
           </Text>
 
           <Text style={styles.debugText}>
-            Authenticated:{' '}
-            {isAuthenticated ? 'Yes' : 'No'}
+            Phone verified: {isPhoneVerified ? 'Yes' : 'No'}
           </Text>
 
           <Text style={styles.debugText}>
-            Phone verified:{' '}
-            {isPhoneVerified ? 'Yes' : 'No'}
+            Welcome completed: {hasSeenWelcome ? 'Yes' : 'No'}
           </Text>
 
           <Text style={styles.debugText}>
-            Welcome completed:{' '}
-            {hasSeenWelcome ? 'Yes' : 'No'}
+            Biometrics: {biometricEnabled ? 'Enabled' : 'Disabled'}
           </Text>
 
           <Text style={styles.debugText}>
-            Biometrics:{' '}
-            {biometricEnabled ? 'Enabled' : 'Disabled'}
-          </Text>
-
-          <Text style={styles.debugText}>
-            PIN:{' '}
-            {pinCreated ? 'Created' : 'Not created'}
+            PIN: {pinCreated ? 'Created' : 'Not created'}
           </Text>
         </View>
+
+        <Button title="DEV: Lock App" variant="outline" onPress={lockApp} />
       </View>
 
       <BiometricSetupModal

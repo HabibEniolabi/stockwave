@@ -12,21 +12,19 @@ import { useAppSession } from '../../context/AppSessionContext';
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
-  const {
-    isAuthenticated,
-    hasSeenWelcome,
-  } = useAppSession();
+  const { isAuthenticated, hasSeenWelcome, pinCreated, isAppUnlocked } =
+    useAppSession();
 
   if (!isAuthenticated) {
-    return (
-      <Redirect href="/(auth)/sign-in" />
-    );
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
   if (!hasSeenWelcome) {
-    return (
-      <Redirect href="/(auth)/WelcomeScreen" />
-    );
+    return <Redirect href="/(auth)/WelcomeScreen" />;
+  }
+
+  if (pinCreated && !isAppUnlocked) {
+    return <Redirect href="/(security)/UnlockPinScreen" />;
   }
 
   return (
@@ -36,10 +34,8 @@ export default function TabsLayout() {
 
         tabBarShowLabel: false,
 
-        tabBarActiveTintColor:
-          colors.neutral[800],
-        tabBarInactiveTintColor:
-          colors.neutral[400],
+        tabBarActiveTintColor: colors.neutral[800],
+        tabBarInactiveTintColor: colors.neutral[400],
 
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabBarItem,
@@ -51,15 +47,8 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
 
-          tabBarIcon: ({
-            color,
-            focused,
-          }) => (
-            <HomeTabIcon
-              size={30}
-              color={color}
-              focused={focused}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <HomeTabIcon size={30} color={color} focused={focused} />
           ),
         }}
       />
@@ -69,15 +58,8 @@ export default function TabsLayout() {
         options={{
           title: 'Portfolio',
 
-          tabBarIcon: ({
-            color,
-            focused,
-          }) => (
-            <PortfolioTabIcon
-              size={30}
-              color={color}
-              focused={focused}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <PortfolioTabIcon size={30} color={color} focused={focused} />
           ),
         }}
       />
@@ -88,15 +70,8 @@ export default function TabsLayout() {
           title: 'Swap',
 
           tabBarIcon: () => (
-            <View
-              style={[
-                styles.swapButton,
-              ]}
-            >
-              <SwapTabIcon
-                size={32}
-                color={colors.other.white}
-              />
+            <View style={[styles.swapButton]}>
+              <SwapTabIcon size={32} color={colors.other.white} />
             </View>
           ),
         }}
@@ -107,15 +82,8 @@ export default function TabsLayout() {
         options={{
           title: 'Market',
 
-          tabBarIcon: ({
-            color,
-            focused,
-          }) => (
-            <MarketTabIcon
-              size={30}
-              color={color}
-              focused={focused}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <MarketTabIcon size={30} color={color} focused={focused} />
           ),
         }}
       />
@@ -125,15 +93,8 @@ export default function TabsLayout() {
         options={{
           title: 'Profile',
 
-          tabBarIcon: ({
-            color,
-            focused,
-          }) => (
-            <ProfileTabIcon
-              size={30}
-              color={color}
-              focused={focused}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <ProfileTabIcon size={30} color={color} focused={focused} />
           ),
         }}
       />
@@ -167,8 +128,8 @@ const styles = StyleSheet.create({
   tabBarIcon: {
     width: 40,
     height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   swapButton: {
@@ -180,6 +141,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
 
-    backgroundColor: colors.primary[100]
+    backgroundColor: colors.primary[100],
   },
 });

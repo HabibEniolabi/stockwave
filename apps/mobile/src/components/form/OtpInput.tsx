@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+
 import {
   Animated,
   Pressable,
@@ -15,6 +16,8 @@ import { fontFamily } from '../../theme/typography';
 
 export type OtpStatus = 'default' | 'error' | 'success';
 
+type OtpVariant = 'boxes' | 'dots';
+type OtpPurpose = 'otp' | 'pin';
 type OtpInputProps = {
   value: string;
   onChangeText: (value: string) => void;
@@ -23,6 +26,35 @@ type OtpInputProps = {
   disabled?: boolean;
   status?: OtpStatus;
   shakeTrigger?: number;
+
+  /*
+   * Increment this whenever the parent
+   * explicitly wants the hidden TextInput
+   * to receive focus again.
+   */
+  focusTrigger?: number;
+
+  /*
+   * OTP = normal OTP autofill behaviour.
+   * PIN = no SMS OTP autofill.
+   */
+  purpose?: OtpPurpose;
+
+  /*
+   * boxes = your existing OTP/PIN boxes.
+   * dots = passcode indicators.
+   */
+  variant?: OtpVariant;
+
+  /*
+   * Hide the actual PIN digits.
+   */
+  secure?: boolean;
+
+  /*
+   * false when using our own custom keypad.
+   */
+  keyboardEnabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -34,17 +66,64 @@ export function OtpInput({
   disabled = false,
   status = 'default',
   shakeTrigger = 0,
+  focusTrigger = 0,
+  purpose = 'otp',
+  variant = 'boxes',
+  secure = false,
+  keyboardEnabled = true,
   style,
 }: OtpInputProps) {
   const inputRef = useRef<TextInput>(null);
   const translateX = useRef(new Animated.Value(0)).current;
-
   const [isFocused, setIsFocused] = useState(false);
 
-  const digits = Array.from({ length }, (_, index) => value[index] ?? '');
+  const digits = Array.from(
+    {
+      length,
+    },
+    (_, index) => value[index] ?? '',
+  );
 
   const activeIndex = value.length >= length ? length - 1 : value.length;
 
+  /*
+   * Initial autofocus.
+   */
+  useEffect(() => {
+    if (!autoFocus || disabled || !keyboardEnabled) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [autoFocus, disabled, keyboardEnabled]);
+
+  /*
+   * Explicit refocus requested by
+   * parent screen.
+   *
+   * This fixes your current Create PIN
+   * problem after moving between steps
+   * or after a PIN mismatch.
+   */
+  useEffect(() => {
+    if (!focusTrigger || disabled || !keyboardEnabled) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [focusTrigger, disabled, keyboardEnabled]);
+
+  /*
+   * Error / success wiggle.
+   */
   useEffect(() => {
     if ((status !== 'error' && status !== 'success') || shakeTrigger === 0) {
       return;
@@ -53,6 +132,7 @@ export function OtpInput({
     translateX.setValue(0);
 
     const distance = status === 'error' ? 10 : 4;
+
     const duration = status === 'error' ? 50 : 80;
 
     Animated.sequence([
@@ -61,21 +141,25 @@ export function OtpInput({
         duration,
         useNativeDriver: true,
       }),
+
       Animated.timing(translateX, {
         toValue: distance,
         duration,
         useNativeDriver: true,
       }),
+
       Animated.timing(translateX, {
         toValue: -(distance * 0.6),
         duration,
         useNativeDriver: true,
       }),
+
       Animated.timing(translateX, {
         toValue: distance * 0.6,
         duration,
         useNativeDriver: true,
       }),
+
       Animated.timing(translateX, {
         toValue: 0,
         duration,
@@ -90,76 +174,127 @@ export function OtpInput({
   };
 
   const handlePress = () => {
-    if (!disabled) {
-      inputRef.current?.focus();
+    if (disabled || !keyboardEnabled) {
+      return;
     }
+
+    inputRef.current?.focus();
   };
 
-  return (
-    <Animated.View
-      style={[
-        styles.animatedContainer,
-        {
-          transform: [{ translateX }],
-        },
-      ]}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Verification code input"
-        disabled={disabled}
-        style={[styles.container, style]}
-        onPress={handlePress}
-      >
+  const content = (
+    <>
+      {keyboardEnabled ? (
         <TextInput
           ref={inputRef}
-          autoFocus={autoFocus}
           value={value}
+          autoFocus={autoFocus}
           editable={!disabled}
           keyboardType="number-pad"
           maxLength={length}
-          textContentType="oneTimeCode"
-          autoComplete="sms-otp"
-          importantForAutofill="yes"
+          secureTextEntry={purpose === 'pin'}
           caretHidden
           style={styles.hiddenInput}
           onChangeText={handleChangeText}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          {...(purpose === 'otp'
+            ? {
+                textContentType: 'oneTimeCode' as const,
+                autoComplete: 'sms-otp' as const,
+                importantForAutofill: 'yes' as const,
+              }
+            : {
+                textContentType: 'none' as const,
+                autoComplete: 'off' as const,
+                importantForAutofill: 'no' as const,
+              })}
         />
+      ) : null}
 
-        {digits.map((digit, index) => {
-          const isActive =
-            isFocused && index === activeIndex && status === 'default';
-
+      {digits.map((digit, index) => {
+        if (variant === 'dots') {
+          const isFilled = Boolean(digit);
           return (
             <View
               key={index}
               style={[
-                styles.box,
-                isActive && styles.boxActive,
-                status === 'error' && styles.boxError,
-                status === 'success' && styles.boxSuccess,
-                disabled && styles.boxDisabled,
+                styles.dot,
+                isFilled && styles.dotFilled,
+                status === 'error' && styles.dotError,
+                status === 'success' && styles.dotSuccess,
               ]}
-            >
-              {digit ? (
-                <Text
-                  style={[
-                    styles.digit,
-                    status === 'error' && styles.digitError,
-                    status === 'success' && styles.digitSuccess,
-                  ]}
-                >
-                  {digit}
-                </Text>
-              ) : isActive ? (
-                <View style={styles.caret} />
-              ) : null}
-            </View>
+            />
           );
-        })}
-      </Pressable>
+        }
+
+        const isActive =
+          isFocused && index === activeIndex && status === 'default';
+
+        return (
+          <View
+            key={index}
+            style={[
+              styles.box,
+              isActive && styles.boxActive,
+              status === 'error' && styles.boxError,
+              status === 'success' && styles.boxSuccess,
+              disabled && styles.boxDisabled,
+            ]}
+          >
+            {digit ? (
+              <Text
+                style={[
+                  styles.digit,
+                  status === 'error' && styles.digitError,
+                  status === 'success' && styles.digitSuccess,
+                ]}
+              >
+                {secure ? '•' : digit}
+              </Text>
+            ) : isActive ? (
+              <View style={styles.caret} />
+            ) : null}
+          </View>
+        );
+      })}
+    </>
+  );
+
+  return (
+    <Animated.View
+      style={[
+        styles.animatedContainer,
+
+        {
+          transform: [
+            {
+              translateX,
+            },
+          ],
+        },
+      ]}
+    >
+      {keyboardEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            purpose === 'pin' ? 'PIN input' : 'Verification code input'
+          }
+          disabled={disabled}
+          style={[
+            styles.container,
+            variant === 'dots' && styles.dotsContainer,
+            style,
+          ]}
+          onPress={handlePress}
+        >
+          {content}
+        </Pressable>
+      ) : (
+        <View style={[styles.container, styles.dotsContainer, style]}>
+          {content}
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -174,6 +309,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 10,
+  },
+
+  dotsContainer: {
+    justifyContent: 'center',
+    gap: 20,
   },
 
   hiddenInput: {
@@ -234,5 +374,28 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: colors.primary[100],
+  },
+
+  dot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.neutral[600],
+    backgroundColor: 'transparent',
+  },
+
+  dotFilled: {
+    borderColor: colors.primary[100],
+    backgroundColor: colors.primary[100],
+  },
+
+  dotError: {
+    borderColor: colors.error.base,
+  },
+
+  dotSuccess: {
+    borderColor: colors.success.base,
+    backgroundColor: colors.success.base,
   },
 });
