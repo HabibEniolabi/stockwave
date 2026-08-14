@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+
+import { useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
-
 import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
@@ -24,23 +25,37 @@ export default function HomeScreen() {
 
     pinCreated,
   } = useAppSession();
+  const isFocused = useIsFocused();
 
   const [biometricModalVisible, setBiometricModalVisible] = useState(false);
 
-  useEffect(() => {
-    const shouldShowBiometricSetup =
-      isAuthenticated && hasSeenWelcome && !pinCreated;
+  useFocusEffect(
+    useCallback(() => {
+      const shouldShowSecuritySetup =
+        isAuthenticated && hasSeenWelcome && !pinCreated;
 
-    if (!shouldShowBiometricSetup) {
-      return;
-    }
+      if (!shouldShowSecuritySetup) {
+        setBiometricModalVisible(false);
+        return;
+      }
 
-    const timer = setTimeout(() => {
-      setBiometricModalVisible(true);
-    }, 1000);
+      const timer = setTimeout(() => {
+        setBiometricModalVisible(true);
+      }, 1000);
 
-    return () => clearTimeout(timer);
-  }, [isAuthenticated, hasSeenWelcome, pinCreated]);
+      return () => {
+        clearTimeout(timer);
+
+        /*
+         * Home lost focus.
+         *
+         * Make sure its modal cannot remain
+         * visible over Portfolio/Swap/etc.
+         */
+        setBiometricModalVisible(false);
+      };
+    }, [isAuthenticated, hasSeenWelcome, pinCreated]),
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -77,12 +92,14 @@ export default function HomeScreen() {
         <Button title="DEV: Lock App" variant="outline" onPress={lockApp} />
       </View>
 
-      <BiometricSetupModal
-        visible={biometricModalVisible}
-        onClose={() => {
-          setBiometricModalVisible(false);
-        }}
-      />
+      {isFocused ? (
+        <BiometricSetupModal
+          visible={biometricModalVisible}
+          onClose={() => {
+            setBiometricModalVisible(false);
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

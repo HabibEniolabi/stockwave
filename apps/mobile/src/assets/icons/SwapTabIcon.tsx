@@ -9,7 +9,7 @@ const SwapTabIcon = ({size = 24, color = "#fff", ...props}: SwapTabIconProps) =>
   <Svg
     width={size}
     height={size}
-    viewBox="0 0 24 24"
+    viewBox="0 0 20 20"
     fill="none"
     {...props}
   >

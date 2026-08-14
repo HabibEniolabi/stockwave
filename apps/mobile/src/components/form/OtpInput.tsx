@@ -94,12 +94,16 @@ export function OtpInput({
       return;
     }
 
+    if (focusTrigger === 0 || disabled) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       inputRef.current?.focus();
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [autoFocus, disabled, keyboardEnabled]);
+  }, [autoFocus, focusTrigger, disabled, keyboardEnabled]);
 
   /*
    * Explicit refocus requested by

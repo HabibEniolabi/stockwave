@@ -70,9 +70,12 @@ export default function TabsLayout() {
           title: 'Swap',
 
           tabBarIcon: () => (
-            <View style={[styles.swapButton]}>
-              <SwapTabIcon size={32} color={colors.other.white} />
-            </View>
+        <View style={styles.swapButton}>
+          <SwapTabIcon
+            size={24}
+            color={colors.other.white}
+          />
+        </View>
           ),
         }}
       />
@@ -105,29 +108,22 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     height: 87,
-
     paddingTop: 8,
     paddingBottom: 10,
     paddingHorizontal: 22,
-
     borderTopWidth: 1,
     borderTopColor: colors.neutral[50],
-
     backgroundColor: colors.other.white,
-
-    overflow: 'visible',
   },
 
   tabBarItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-
     paddingHorizontal: 0,
   },
 
   tabBarIcon: {
-    width: 40,
-    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -135,7 +131,6 @@ const styles = StyleSheet.create({
   swapButton: {
     width: 40,
     height: 40,
-
     borderRadius: 20,
 
     alignItems: 'center',
