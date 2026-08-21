@@ -43,7 +43,7 @@ export const supabase = createClient(
  */
 export function registerSupabaseAuthLifecycle() {
   if (Platform.OS === 'web') {
-    return () => {};
+    return;
   }
 
   if (AppState.currentState === 'active') {

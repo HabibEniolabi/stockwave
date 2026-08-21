@@ -15,6 +15,13 @@ export default function TabsLayout() {
   const { isAuthenticated, hasSeenWelcome, pinCreated, isAppUnlocked } =
     useAppSession();
 
+  console.log('TABS SESSION', {
+    isAuthenticated,
+    hasSeenWelcome,
+    pinCreated,
+    isAppUnlocked,
+  });
+
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -70,12 +77,9 @@ export default function TabsLayout() {
           title: 'Swap',
 
           tabBarIcon: () => (
-        <View style={styles.swapButton}>
-          <SwapTabIcon
-            size={24}
-            color={colors.other.white}
-          />
-        </View>
+            <View style={styles.swapButton}>
+              <SwapTabIcon size={24} color={colors.other.white} />
+            </View>
           ),
         }}
       />

@@ -13,7 +13,14 @@ import { useAppSession } from '../../context/AppSessionContext';
 export default function WelcomeScreen() {
   const {
     completeWelcome,
+    isAuthenticated,
+    hasSeenWelcome
   } = useAppSession();
+
+  console.log('WELCOME SESSION', {
+    isAuthenticated,
+    hasSeenWelcome,
+  });
 
   const handleContinue = () => {
     completeWelcome();
