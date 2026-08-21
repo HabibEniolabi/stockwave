@@ -28,8 +28,12 @@ export default function SignUpScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isSigningUp, setIsSigningUp] = useState(false)
 
   const handleContinue = () => {
+    if(isSigningUp){
+      return;
+    }
     const normalizedUsername = username.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -73,6 +77,8 @@ export default function SignUpScreen() {
       setPasswordError('Password must be at least 8 characters.');
       return;
     }
+
+    setIsSigningUp(true);
 
     console.log({
       username: normalizedUsername,
@@ -180,6 +186,7 @@ export default function SignUpScreen() {
             <Button
               title="Continue"
               onPress={handleContinue}
+              loading={isSigningUp}
               disabled={formIsComplete}
               variant="primary"
             />

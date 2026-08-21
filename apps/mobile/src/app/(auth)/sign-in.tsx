@@ -27,10 +27,15 @@ export default function SignInScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
   const { completeSignIn } = useAppSession();
 
   const handleSignIn = () => {
+    if(isSigningIn){
+      return;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     setEmailError('');
@@ -56,6 +61,7 @@ export default function SignInScreen() {
       return;
     }
 
+    setIsSigningIn(true);
     completeSignIn();
 
     console.log({
@@ -141,6 +147,7 @@ export default function SignInScreen() {
             <Button
               title="Sign in"
               variant="primary"
+              loading={isSigningIn}
               disabled={formIsIncomplete}
               onPress={handleSignIn}
             />

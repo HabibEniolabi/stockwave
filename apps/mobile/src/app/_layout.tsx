@@ -12,6 +12,8 @@ import {
 import { useFonts } from 'expo-font';
 import { AppSessionProvider } from '../context/AppSessionContext';
 
+import { registerSupabaseAuthLifecycle } from '../lib/supabase';
+
 SplashScreen.preventAutoHideAsync();
 
 const Layout = () => {
@@ -22,6 +24,11 @@ const Layout = () => {
     'Inter-Bold': Inter_700Bold,
     'Inter-ExtraBold': Inter_800ExtraBold,
   });
+
+  useEffect(() => {
+    const cleanup = registerSupabaseAuthLifecycle();
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     if (fontError) {
@@ -44,108 +51,6 @@ const Layout = () => {
     <AppSessionProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
-        {/* <Stack.Screen
-          name="index"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="walkthroughScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/sign-in"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/sign-up"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/PhoneNumberScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/OtpVerificationScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/WelcomeScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/BiometricSetupScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/CreateNewPasswordScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/PasswordResetSuccessScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(auth)/ResetPasswordVerificationScreen"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(tabs)/home"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(tabs)/market"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(tabs)/portfolio"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(tabs)/profile"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(tabs)/swap"
-          options={{
-            animation: 'fade',
-          }}
-        />
-         <Stack.Screen
-          name="(security)/CreatePinScreen"
-          options={{
-            animation: 'fade',
-          }}
-        /> */}
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(security)" />

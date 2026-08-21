@@ -3994,6 +3994,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-async-storage/async-storage@npm:1.23.1":
+  version: 1.23.1
+  resolution: "@react-native-async-storage/async-storage@npm:1.23.1"
+  dependencies:
+    merge-options: "npm:^3.0.4"
+  peerDependencies:
+    react-native: ^0.0.0-0 || >=0.60 <1.0
+  checksum: 10c0/6cfdcab91f0e04f80f4aa91397eb4aedcd1124bf2a997cb730c7f2c70dad75d2aa0ca0f41576ed4e34544a1f79e090169f566366c32a89a41b74bf74bea1c1db
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.76.9":
   version: 0.76.9
   resolution: "@react-native/assets-registry@npm:0.76.9"
@@ -5131,7 +5142,9 @@ __metadata:
     "@babel/core": "npm:^7.25.2"
     "@expo/metro-config": "npm:~0.19.0"
     "@expo/vector-icons": "npm:~14.0.4"
+    "@react-native-async-storage/async-storage": "npm:1.23.1"
     "@react-native/metro-config": "npm:*"
+    "@supabase/supabase-js": "npm:^2.112.3"
     "@types/react": "npm:~18.3.12"
     expo: "npm:~52.0.49"
     expo-constants: "npm:~17.0.8"
@@ -5160,6 +5173,7 @@ __metadata:
     react-native-safe-area-context: "npm:4.12.0"
     react-native-screens: "npm:~4.4.0"
     react-native-svg: "npm:15.8.0"
+    react-native-url-polyfill: "npm:^4.0.0"
   languageName: unknown
   linkType: soft
 
@@ -5211,6 +5225,78 @@ __metadata:
     vitest: "npm:~4.1.0"
   languageName: unknown
   linkType: soft
+
+"@supabase/auth-js@npm:2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/auth-js@npm:2.112.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/5bef93ad73c7cd4b371da174405299eb807d2cb460d499814dee83796c17c2aaa431a7f7892915554d4a52e5479fd1daf5562661017a2f23e7f173110150ffc6
+  languageName: node
+  linkType: hard
+
+"@supabase/functions-js@npm:2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/functions-js@npm:2.112.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/f9be03b1b14c742edd083f7a67a52723114ab6dfb46ceee9bf46068a2620bf7b5b9b0b319668b8fa1ab780a03a0e038170380e1aac7493af4197972ea394d37a
+  languageName: node
+  linkType: hard
+
+"@supabase/phoenix@npm:0.4.5":
+  version: 0.4.5
+  resolution: "@supabase/phoenix@npm:0.4.5"
+  checksum: 10c0/33be3994c870eb3a5f89d3bf6d57783a14f49f710b15e852f85c9750b45f3db5a637b30f7046474fa88f40cce50620e3bce18a27d9819ae16be792776bbfeb9c
+  languageName: node
+  linkType: hard
+
+"@supabase/postgrest-js@npm:2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/postgrest-js@npm:2.112.3"
+  dependencies:
+    tslib: "npm:2.8.1"
+  checksum: 10c0/333c3220e9275170d1d97a7d71254370247d813101190e3430e08bbc5dc24e7451b3c3fb84a18163219f3ff36a1d871e996d7b3b3188bc439ea2b344a42ad1ce
+  languageName: node
+  linkType: hard
+
+"@supabase/realtime-js@npm:2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/realtime-js@npm:2.112.3"
+  dependencies:
+    "@supabase/phoenix": "npm:0.4.5"
+    tslib: "npm:2.8.1"
+  checksum: 10c0/fd56dd122177dc44edc37b7d9d6243fdb61e6889da9559f5f90c00609d480c6ddcdcf9119db282ba674c58944d2a2e72c96c490abfaeb902b2875e7ff521dc15
+  languageName: node
+  linkType: hard
+
+"@supabase/storage-js@npm:2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/storage-js@npm:2.112.3"
+  dependencies:
+    iceberg-js: "npm:^0.8.1"
+    tslib: "npm:2.8.1"
+  checksum: 10c0/55d9ae090b0af7fdbde5b1a8b32cb9fc1a76ac0cc8adc076afe6686f8cf9d44cf230b231a4fab537534719d1c048c55aba37fd2a2ce688a73fbfd5f315f6d2e3
+  languageName: node
+  linkType: hard
+
+"@supabase/supabase-js@npm:^2.112.3":
+  version: 2.112.3
+  resolution: "@supabase/supabase-js@npm:2.112.3"
+  dependencies:
+    "@supabase/auth-js": "npm:2.112.3"
+    "@supabase/functions-js": "npm:2.112.3"
+    "@supabase/postgrest-js": "npm:2.112.3"
+    "@supabase/realtime-js": "npm:2.112.3"
+    "@supabase/storage-js": "npm:2.112.3"
+  peerDependencies:
+    "@opentelemetry/api": ">=1.0.0"
+  peerDependenciesMeta:
+    "@opentelemetry/api":
+      optional: true
+  checksum: 10c0/91e0238311069c0a8bc4180495e3c628a7f543eea978493cd5eb03e34a3175f84adb4592397c59090ea4f6458aa0a74824fb10e6be19676c646b344cbc1d4102
+  languageName: node
+  linkType: hard
 
 "@svgr/babel-plugin-add-jsx-attribute@npm:8.0.0":
   version: 8.0.0
@@ -10961,6 +11047,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"iceberg-js@npm:^0.8.1":
+  version: 0.8.1
+  resolution: "iceberg-js@npm:0.8.1"
+  checksum: 10c0/e504da64cc26e8ad7c5344353a7203c671a740c14eb6086f20505f5e9739cab774493e616032530c962df97f2a855115cc2e89a47dd81581df5917b21a69ec48
+  languageName: node
+  linkType: hard
+
 "iconv-lite@npm:0.6.3, iconv-lite@npm:^0.6.2":
   version: 0.6.3
   resolution: "iconv-lite@npm:0.6.3"
@@ -11384,6 +11477,13 @@ __metadata:
   version: 3.0.3
   resolution: "is-path-inside@npm:3.0.3"
   checksum: 10c0/cf7d4ac35fb96bab6a1d2c3598fe5ebb29aafb52c0aaa482b5a3ed9d8ba3edc11631e3ec2637660c44b3ce0e61a08d54946e8af30dec0b60a7c27296c68ffd05
+  languageName: node
+  linkType: hard
+
+"is-plain-obj@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "is-plain-obj@npm:2.1.0"
+  checksum: 10c0/e5c9814cdaa627a9ad0a0964ded0e0491bfd9ace405c49a5d63c88b30a162f1512c069d5b80997893c4d0181eadc3fed02b4ab4b81059aba5620bfcdfdeb9c53
   languageName: node
   linkType: hard
 
@@ -13477,6 +13577,15 @@ __metadata:
   version: 1.0.3
   resolution: "merge-descriptors@npm:1.0.3"
   checksum: 10c0/866b7094afd9293b5ea5dcd82d71f80e51514bed33b4c4e9f516795dc366612a4cbb4dc94356e943a8a6914889a914530badff27f397191b9b75cda20b6bae93
+  languageName: node
+  linkType: hard
+
+"merge-options@npm:^3.0.4":
+  version: 3.0.4
+  resolution: "merge-options@npm:3.0.4"
+  dependencies:
+    is-plain-obj: "npm:^2.1.0"
+  checksum: 10c0/02b5891ceef09b0b497b5a0154c37a71784e68ed71b14748f6fd4258ffd3fe4ecd5cb0fd6f7cae3954fd11e7686c5cb64486daffa63c2793bbe8b614b61c7055
   languageName: node
   linkType: hard
 
@@ -15994,6 +16103,15 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/03d2cb19c799da6ba41dea0dc414338d01a55549ea4e4a370315c8ec34e1c6de430a62b538f099423060edc8bea6df134f765bde862770059404617c3c296af8
+  languageName: node
+  linkType: hard
+
+"react-native-url-polyfill@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "react-native-url-polyfill@npm:4.0.0"
+  peerDependencies:
+    react-native: "*"
+  checksum: 10c0/77985560495f71bdb1e78fe3d030f249608ae65fb48d55d8ae34f91119409ac493193d2c4e16456c5068e421df74fa2d1d430c54740a074e2d3aabc4f3cbed21
   languageName: node
   linkType: hard
 
