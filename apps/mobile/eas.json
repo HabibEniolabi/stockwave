@@ -23,7 +23,8 @@
       }
     },
     "production": {
-      "corepack": true
+      "corepack": true,
+      "environment": "production"
     }
   }
 }

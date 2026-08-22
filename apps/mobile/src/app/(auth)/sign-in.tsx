@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -27,12 +27,18 @@ export default function SignInScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [isSigningIn, setIsSigningIn] = useState(false)
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const { completeSignIn } = useAppSession();
+  const { completeSignIn, isAuthenticated, hasSeenWelcome } = useAppSession();
+
+  useEffect(() => {
+    if (isAuthenticated && hasSeenWelcome) {
+      router.replace('/(tabs)/home');
+    }
+  }, [isAuthenticated, hasSeenWelcome]);
 
   const handleSignIn = () => {
-    if(isSigningIn){
+    if (isSigningIn) {
       return;
     }
 
@@ -62,15 +68,9 @@ export default function SignInScreen() {
     }
 
     setIsSigningIn(true);
+
+    // Later this will happen after Supabase returns successfully.
     completeSignIn();
-
-    console.log({
-      email: normalizedEmail,
-      password,
-    });
-
-    // Replace this with your authentication request later.
-    router.replace('/(tabs)/home');
   };
 
   const handleGoogleSignIn = () => {
@@ -79,6 +79,10 @@ export default function SignInScreen() {
 
   const handleAppleSignIn = () => {
     console.log('Continue with Apple');
+  };
+
+  const handlePhoneSignIn = () => {
+    console.log('Continue with Phone');
   };
 
   const formIsIncomplete = !email.trim() || !password;
@@ -166,6 +170,7 @@ export default function SignInScreen() {
             <SocialSignIn
               onGooglePress={handleGoogleSignIn}
               onApplePress={handleAppleSignIn}
+              onPhonePress={handlePhoneSignIn}
             />
           </View>
 

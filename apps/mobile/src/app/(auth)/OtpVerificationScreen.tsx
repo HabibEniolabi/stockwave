@@ -51,8 +51,8 @@ export default function OtpVerificationScreen() {
 
     setError('');
     setIsVerifying(true);
+    setOtpStatus('default');
 
-    // Temporary delay so the loading state is visible.
     setTimeout(() => {
       if (code !== generatedOtp) {
         setOtpStatus('error');
@@ -63,12 +63,15 @@ export default function OtpVerificationScreen() {
       }
 
       setOtpStatus('success');
+      setShakeTrigger((current) => current + 1);
 
-      // Show the green state briefly before navigating.
+      // THIS WAS MISSING
+      completePhoneVerification();
+
       setTimeout(() => {
         router.replace('/(auth)/WelcomeScreen');
-      }, 700);
-    }, 400);
+      }, SUCCESS_DELAY);
+    }, VERIFY_DELAY);
   };
 
   const handleCodeChange = (value: string) => {
@@ -102,31 +105,7 @@ export default function OtpVerificationScreen() {
       return;
     }
 
-    setIsVerifying(true);
-    setOtpStatus('default');
-
-    // Hold briefly while showing "Verifying..."
-    setTimeout(() => {
-      if (verificationCode !== generatedOtp) {
-        setOtpStatus('error');
-        setShakeTrigger((current) => current + 1);
-        setError('The verification code is incorrect.');
-        setIsVerifying(false);
-        return;
-      }
-
-      // Turn the boxes green and trigger a lighter wiggle.
-      setOtpStatus('success');
-      setShakeTrigger((current) => current + 1);
-
-      //Update dumpy aplication statw
-      completePhoneVerification();
-
-      // Keep the success state visible before navigating.
-      setTimeout(() => {
-        router.replace('/(auth)/WelcomeScreen');
-      }, SUCCESS_DELAY);
-    }, VERIFY_DELAY);
+    verifyCode(verificationCode);
   };
 
   const handleResendCode = () => {

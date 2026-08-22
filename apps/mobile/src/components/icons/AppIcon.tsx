@@ -24,7 +24,8 @@ export type AppIconName =
   | 'visibilityOff'
   | 'faceId'
   | 'fingerprint'
-  | 'checkmark';
+  | 'checkmark'
+  | 'phone';
 
 interface AppIconProps {
   name: AppIconName;
@@ -109,6 +110,9 @@ const icons: Record<
   checkmark: {
     default: 'checkmark-circle-outline',
     focused: 'checkmark-circle'
+  },
+  phone: {
+    default: 'call'
   }
 };
 

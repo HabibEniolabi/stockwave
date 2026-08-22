@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
+import { AppIcon } from '../icons/AppIcon';
 
 type SocialProvider = {
   id: string;
@@ -18,6 +19,7 @@ type SocialProvider = {
 type SocialSignInProps = {
   onGooglePress: () => void;
   onApplePress: () => void;
+  onPhonePress: () => void;
   /** Blocks both buttons while a sign-in is mid-flight. */
   busyProvider?: string | null;
 };
@@ -25,6 +27,7 @@ type SocialSignInProps = {
 export function SocialSignIn({
   onGooglePress,
   onApplePress,
+  onPhonePress,
   busyProvider = null,
 }: SocialSignInProps) {
   /**
@@ -52,7 +55,14 @@ export function SocialSignIn({
             onPress: onApplePress,
           },
         ]
-      : []),
+      : [
+        {
+          id: 'phone',
+          title: 'Continue with Phone',
+          icon: <AppIcon name="phone" size={26} color={colors.neutral[900]} />,
+          onPress: onPhonePress,
+        },
+      ]),
   ];
 
   return (

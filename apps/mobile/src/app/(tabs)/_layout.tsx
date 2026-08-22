@@ -15,13 +15,6 @@ export default function TabsLayout() {
   const { isAuthenticated, hasSeenWelcome, pinCreated, isAppUnlocked } =
     useAppSession();
 
-  console.log('TABS SESSION', {
-    isAuthenticated,
-    hasSeenWelcome,
-    pinCreated,
-    isAppUnlocked,
-  });
-
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -111,7 +104,7 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 87,
+    height: 67,
     paddingTop: 8,
     paddingBottom: 10,
     paddingHorizontal: 22,
