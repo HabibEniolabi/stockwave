@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { getTypography } from '../../theme/typography';
 import { SocialSignIn } from '../../components/ui/SocianSignin';
+import { signUpWithEmail } from '../../services/auth';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -28,66 +29,74 @@ export default function SignUpScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [isSigningUp, setIsSigningUp] = useState(false)
+  const [isSigningUp, setIsSigningUp] = useState(false);
 
-  const handleContinue = () => {
-    if(isSigningUp){
-      return;
-    }
-    const normalizedUsername = username.trim();
-    const normalizedEmail = email.trim().toLowerCase();
+  // ...existing code...
+const [firstName, setFirstName] = useState('');
+const [lastName, setLastName] = useState('');
 
-    setUsernameError('');
-    setEmailError('');
-    setPasswordError('');
+const handleContinue = async () => {
+  if (isSigningUp) {
+    return;
+  }
 
-    if (!normalizedUsername) {
-      setUsernameError('Username is required.');
-      return;
-    }
+  const normalizedUsername = username.trim();
+  const normalizedEmail = email.trim().toLowerCase();
 
-    if (normalizedUsername.length < 3) {
-      setUsernameError('Username must be at least 3 characters.');
-      return;
-    }
+  setUsernameError('');
+  setEmailError('');
+  setPasswordError('');
 
-    if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
-      setUsernameError(
-        'Username can only contain letters, numbers and underscores.',
-      );
-      return;
-    }
+  if (!normalizedUsername) {
+    setUsernameError('Username is required.');
+    return;
+  }
 
-    if (!normalizedEmail) {
-      setEmailError('Email address is required.');
-      return;
-    }
+  if (normalizedUsername.length < 3) {
+    setUsernameError('Username must be at least 3 characters.');
+    return;
+  }
 
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setEmailError('Enter a valid email address.');
-      return;
-    }
+  if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
+    setUsernameError('Username can only contain letters, numbers and underscores.');
+    return;
+  }
 
-    if (!password) {
-      setPasswordError('Password is required.');
-      return;
-    }
+  if (!normalizedEmail) {
+    setEmailError('Email address is required.');
+    return;
+  }
 
-    if (password.length < 8) {
-      setPasswordError('Password must be at least 8 characters.');
-      return;
-    }
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    setEmailError('Enter a valid email address.');
+    return;
+  }
 
+  if (!password) {
+    setPasswordError('Password is required.');
+    return;
+  }
+
+  if (password.length < 8) {
+    setPasswordError('Password must be at least 8 characters.');
+    return;
+  }
+
+  try {
     setIsSigningUp(true);
 
-    console.log({
-      username: normalizedUsername,
-      email: normalizedEmail,
-      password,
+    await signUpWithEmail(email, password, {
+      first_name: firstName,
+      last_name: lastName,
     });
 
     router.push('/(auth)/PhoneNumberScreen');
-  };
+  } catch (error) {
+    // show error
+  } finally {
+    setIsSigningUp(false);
+  }
+};
 
   const handleGoogleSignUp = () => {
     console.log('Continue with Google');
@@ -95,6 +104,15 @@ export default function SignUpScreen() {
 
   const handleAppleSignUp = () => {
     console.log('Continue with Apple');
+  };
+
+  const handlePhoneSignUp = () => {
+    router.push({
+      pathname: '/(auth)/PhoneAuthScreen',
+      params: {
+        mode: 'sign-up',
+      },
+    });
   };
 
   const formIsComplete = !email.trim() || !password || !username.trim();
@@ -194,6 +212,7 @@ export default function SignUpScreen() {
             <SocialSignIn
               onGooglePress={handleGoogleSignUp}
               onApplePress={handleAppleSignUp}
+              onPhonePress={handlePhoneSignUp}
             />
           </View>
 

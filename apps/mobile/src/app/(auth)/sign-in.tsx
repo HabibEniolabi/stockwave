@@ -20,6 +20,7 @@ import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
 import { SocialSignIn } from '../../components/ui/SocianSignin';
 import { useAppSession } from '../../context/AppSessionContext';
+import { signInWithEmail } from '../../services/auth';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -37,7 +38,7 @@ export default function SignInScreen() {
     }
   }, [isAuthenticated, hasSeenWelcome]);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (isSigningIn) {
       return;
     }
@@ -67,10 +68,28 @@ export default function SignInScreen() {
       return;
     }
 
+    try {
     setIsSigningIn(true);
 
-    // Later this will happen after Supabase returns successfully.
-    completeSignIn();
+    await signInWithEmail(
+      normalizedEmail,
+      password,
+    );
+
+    // Do NOT call completeSignIn().
+    // Do NOT manually set isAuthenticated.
+    //
+    // AppSessionContext will receive the
+    // Supabase auth state change.
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unable to sign in.';
+
+    setPasswordError(message);
+    setIsSigningIn(false);
+  }
   };
 
   const handleGoogleSignIn = () => {
@@ -82,7 +101,12 @@ export default function SignInScreen() {
   };
 
   const handlePhoneSignIn = () => {
-    console.log('Continue with Phone');
+    router.push({
+    pathname: '/(auth)/PhoneAuthScreen',
+    params: {
+      mode: 'sign-in',
+    },
+  });
   };
 
   const formIsIncomplete = !email.trim() || !password;
