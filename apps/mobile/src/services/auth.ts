@@ -6,26 +6,13 @@ export type SignUpPayload = {
   password: string;
 };
 
-export async function signInWithEmail(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
 export async function signUpWithEmail({
   username,
   email,
   password,
 }: SignUpPayload) {
-  const normalizedEmail = email.trim().toLowerCase();
   const normalizedUsername = username.trim();
+  const normalizedEmail = email.trim().toLowerCase();
 
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
@@ -42,39 +29,18 @@ export async function signUpWithEmail({
     throw error;
   }
 
-  /*
-   * Our current StockWave registration flow
-   * requires an authenticated session immediately.
-   *
-   * If Supabase email confirmation is enabled,
-   * signUp may return a user but no session.
-   */
   if (!data.session) {
-    throw new Error(
-      'Registration requires an active session. Disable email confirmation for the current StockWave signup flow.',
-    );
+    throw new Error('Unable to start your session after registration.');
   }
 
   return data;
 }
 
-export async function requestPhoneVerification(
-  phone: string,
-) {
-  const normalizedPhone = phone.trim();
-
-  const { data, error } =
-    await supabase.auth.updateUser({
-      phone: normalizedPhone,
-
-      data: {
-        /*
-         * Temporarily save this so the OTP
-         * flow can recover it if necessary.
-         */
-        registration_phone: normalizedPhone,
-      },
-    });
+export async function signInWithEmail(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
 
   if (error) {
     throw error;
@@ -83,6 +49,35 @@ export async function requestPhoneVerification(
   return data;
 }
 
+/**
+ * User is already authenticated through
+ * email/password at this point.
+ *
+ * This attaches the phone number to that
+ * existing Supabase account and triggers
+ * the phone verification OTP.
+ */
+export async function requestPhoneVerification(phone: string) {
+  const normalizedPhone = phone.trim();
+
+  const { data, error } = await supabase.auth.updateUser({
+    phone: normalizedPhone,
+
+    data: {
+      /*
+       * Temporarily save this so the OTP
+       * flow can recover it if necessary.
+       */
+      registration_phone: normalizedPhone,
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
 
 export async function verifyPhoneChange(phone: string, token: string) {
   const { data, error } = await supabase.auth.verifyOtp({
@@ -95,10 +90,6 @@ export async function verifyPhoneChange(phone: string, token: string) {
     throw error;
   }
 
-  /*
-   * We no longer need the temporary
-   * registration phone metadata.
-   */
   const { error: metadataError } = await supabase.auth.updateUser({
     data: {
       registration_phone: null,
@@ -107,7 +98,7 @@ export async function verifyPhoneChange(phone: string, token: string) {
 
   if (metadataError) {
     console.warn(
-      'Unable to clear registration phone metadata:',
+      'Unable to clear temporary phone metadata:',
       metadataError.message,
     );
   }
@@ -115,10 +106,10 @@ export async function verifyPhoneChange(phone: string, token: string) {
   return data;
 }
 
-export async function resendPhoneChangeOtp(phone: string) {
+export async function resendPhoneVerification(phone: string) {
   const { error } = await supabase.auth.resend({
     type: 'phone_change',
-    phone,
+    phone: phone.trim(),
   });
 
   if (error) {

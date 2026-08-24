@@ -12,8 +12,27 @@ import { useAppSession } from '../../context/AppSessionContext';
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
-  const { isAuthenticated, hasSeenWelcome, pinCreated, isAppUnlocked } =
-    useAppSession();
+  const {
+    isAuthenticated,
+    hasSeenWelcome,
+    pinCreated,
+    isAppUnlocked,
+    isSessionReady,
+    isPhoneVerified,
+  } = useAppSession();
+
+  console.log('TABS SESSION', {
+    isSessionReady,
+    isAuthenticated,
+    isPhoneVerified,
+    hasSeenWelcome,
+    pinCreated,
+    isAppUnlocked,
+  });
+
+  if (!isSessionReady){
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/sign-in" />;

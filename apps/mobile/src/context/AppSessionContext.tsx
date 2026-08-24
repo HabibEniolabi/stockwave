@@ -6,16 +6,14 @@ import {
   type ReactNode,
 } from 'react';
 
-import type {
-  Session,
-  User,
-} from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
 
 import {
   markWelcomeSeen,
-  resendPhoneChangeOtp,
+  requestPhoneVerification,
+  resendPhoneVerification,
   signInWithEmail,
   signOut,
   signUpWithEmail,
@@ -37,23 +35,15 @@ type AppSessionContextValue = {
 
   pendingPhone: string;
 
-  signIn: (
-    email: string,
-    password: string,
-  ) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
 
-  signUp: (
-    payload: SignUpPayload,
-  ) => Promise<void>;
+  signUp: (payload: SignUpPayload) => Promise<void>;
 
-  verifyPhoneCode: (
-    code: string,
-    phone?: string,
-  ) => Promise<void>;
+  startPhoneVerification: (phone: string) => Promise<void>;
 
-  resendPhoneCode: (
-    phone?: string,
-  ) => Promise<void>;
+  verifyPhoneCode: (code: string) => Promise<void>;
+
+  resendPhoneCode: () => Promise<void>;
 
   completeWelcome: () => Promise<void>;
 
@@ -66,9 +56,7 @@ type AppSessionContextValue = {
 
   createPin: (pin: string) => Promise<void>;
 
-  verifyPin: (
-    pin: string,
-  ) => Promise<boolean>;
+  verifyPin: (pin: string) => Promise<boolean>;
 
   unlockApp: () => void;
   lockApp: () => void;
@@ -85,13 +73,9 @@ type AppSessionContextValue = {
   resetPasswordCode: string;
   resetPasswordVerified: boolean;
 
-  startPasswordReset: (
-    email: string,
-  ) => void;
+  startPasswordReset: (email: string) => void;
 
-  setResetPasswordCode: (
-    code: string,
-  ) => void;
+  setResetPasswordCode: (code: string) => void;
 
   verifyPasswordResetCode: () => void;
 
@@ -103,32 +87,25 @@ type AppSessionContextValue = {
   resetSession: () => Promise<void>;
 };
 
-const AppSessionContext =
-  createContext<
-    AppSessionContextValue | undefined
-  >(undefined);
+const AppSessionContext = createContext<AppSessionContextValue | undefined>(
+  undefined,
+);
 
 type AppSessionProviderProps = {
   children: ReactNode;
 };
 
-export function AppSessionProvider({
-  children,
-}: AppSessionProviderProps) {
+export function AppSessionProvider({ children }: AppSessionProviderProps) {
   /*
    * Supabase session
    */
-  const [session, setSession] =
-    useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
-  const [isSessionReady, setIsSessionReady] =
-    useState(false);
+  const [isSessionReady, setIsSessionReady] = useState(false);
 
-  const [hasSeenWelcome, setHasSeenWelcome] =
-    useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
-  const [pendingPhone, setPendingPhone] =
-    useState('');
+  const [pendingPhone, setPendingPhone] = useState('');
 
   /*
    * Device security
@@ -137,55 +114,37 @@ export function AppSessionProvider({
    * We'll persist this properly after
    * authentication is stable.
    */
-  const [biometricEnabled, setBiometricEnabled] =
-    useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  const [pinCreated, setPinCreated] =
-    useState(false);
+  const [pinCreated, setPinCreated] = useState(false);
 
-  const [isAppUnlocked, setIsAppUnlocked] =
-    useState(false);
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false);
 
-  const [devicePin, setDevicePin] =
-    useState<string | null>(null);
+  const [devicePin, setDevicePin] = useState<string | null>(null);
 
   /*
    * Password reset temporary state
    */
-  const [
-    resetPasswordEmail,
-    setResetPasswordEmail,
-  ] = useState('');
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('');
 
-  const [
-    resetPasswordCode,
-    setResetPasswordCode,
-  ] = useState('');
+  const [resetPasswordCode, setResetPasswordCode] = useState('');
 
-  const [
-    resetPasswordVerified,
-    setResetPasswordVerified,
-  ] = useState(false);
+  const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
 
   const user = session?.user ?? null;
 
   const isAuthenticated = Boolean(session);
 
-  const isPhoneVerified = Boolean(
-    user?.phone_confirmed_at,
-  );
+  const isPhoneVerified = Boolean(user?.phone_confirmed_at);
 
   /*
    * Sync context state from whatever
    * Supabase says the current session is.
    */
-  const syncSession = (
-    nextSession: Session | null,
-  ) => {
+  const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
 
-    const nextUser =
-      nextSession?.user ?? null;
+    const nextUser = nextSession?.user ?? null;
 
     if (!nextUser) {
       setHasSeenWelcome(false);
@@ -193,25 +152,12 @@ export function AppSessionProvider({
       return;
     }
 
-    setHasSeenWelcome(
-      Boolean(
-        nextUser.user_metadata
-          ?.has_seen_welcome,
-      ),
-    );
+    setHasSeenWelcome(Boolean(nextUser.user_metadata?.has_seen_welcome));
 
-    const registrationPhone =
-      nextUser.user_metadata
-        ?.registration_phone;
+    const registrationPhone = nextUser.user_metadata?.registration_phone;
 
-    if (
-      typeof registrationPhone === 'string'
-    ) {
-      setPendingPhone(
-        registrationPhone,
-      );
-    } else {
-      setPendingPhone('');
+    if (typeof registrationPhone === 'string') {
+      setPendingPhone(registrationPhone);
     }
   };
 
@@ -223,20 +169,14 @@ export function AppSessionProvider({
     let mounted = true;
 
     const restoreSession = async () => {
-      const {
-        data,
-        error,
-      } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
 
       if (!mounted) {
         return;
       }
 
       if (error) {
-        console.error(
-          'Unable to restore Supabase session:',
-          error.message,
-        );
+        console.error('Unable to restore Supabase session:', error.message);
       }
 
       syncSession(data.session);
@@ -247,17 +187,14 @@ export function AppSessionProvider({
 
     const {
       data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, nextSession) => {
-          if (!mounted) {
-            return;
-          }
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) {
+        return;
+      }
 
-          syncSession(nextSession);
-          setIsSessionReady(true);
-        },
-      );
+      syncSession(nextSession);
+      setIsSessionReady(true);
+    });
 
     return () => {
       mounted = false;
@@ -268,15 +205,8 @@ export function AppSessionProvider({
   /*
    * Email/password sign in
    */
-  const signIn = async (
-    email: string,
-    password: string,
-  ) => {
-    const data =
-      await signInWithEmail(
-        email,
-        password,
-      );
+  const signIn = async (email: string, password: string) => {
+    const data = await signInWithEmail(email, password);
 
     syncSession(data.session);
 
@@ -290,74 +220,52 @@ export function AppSessionProvider({
   /*
    * Email/password registration
    */
-  const signUp = async (
-    payload: SignUpPayload,
-  ) => {
-    setPendingPhone(
-      payload.phone.trim(),
-    );
-
-    const data =
-      await signUpWithEmail(payload);
+  const signUp = async (payload: SignUpPayload) => {
+    const data = await signUpWithEmail(payload);
 
     syncSession(data.session);
 
     setIsAppUnlocked(true);
   };
 
+  const startPhoneVerification = async (phone: string) => {
+    const normalizedPhone = phone.trim();
+
+    if (!normalizedPhone) {
+      throw new Error('Phone number is required.');
+    }
+
+    await requestPhoneVerification(normalizedPhone);
+
+    setPendingPhone(normalizedPhone);
+  };
+
   /*
    * Phone verification
    */
-  const verifyPhoneCode = async (
-    code: string,
-    explicitPhone?: string,
-  ) => {
-    const phone =
-      explicitPhone?.trim() ||
-      pendingPhone.trim();
-
-    if (!phone) {
-      throw new Error(
-        'No phone number is available for verification.',
-      );
+  const verifyPhoneCode = async (code: string) => {
+    if (!pendingPhone) {
+      throw new Error('No phone number is currently being verified.');
     }
 
-    await verifyPhoneChange(
-      phone,
-      code,
-    );
+    await verifyPhoneChange(pendingPhone, code);
 
-    /*
-     * Refresh the session so user.phone and
-     * phone_confirmed_at immediately reflect
-     * the successful verification.
-     */
-    const { data, error } =
-      await supabase.auth.refreshSession();
+    const { data, error } = await supabase.auth.refreshSession();
 
     if (error) {
       throw error;
     }
 
     syncSession(data.session);
-
     setPendingPhone('');
   };
 
-  const resendPhoneCode = async (
-    explicitPhone?: string,
-  ) => {
-    const phone =
-      explicitPhone?.trim() ||
-      pendingPhone.trim();
-
-    if (!phone) {
-      throw new Error(
-        'No phone number is available for verification.',
-      );
+  const resendPhoneCode = async () => {
+    if (!pendingPhone) {
+      throw new Error('No phone number is currently being verified.');
     }
 
-    await resendPhoneChangeOtp(phone);
+    await resendPhoneVerification(pendingPhone);
   };
 
   /*
@@ -378,17 +286,13 @@ export function AppSessionProvider({
    *
    * Development implementation.
    */
-  const createPin = async (
-    pin: string,
-  ) => {
+  const createPin = async (pin: string) => {
     setDevicePin(pin);
     setPinCreated(true);
     setIsAppUnlocked(true);
   };
 
-  const verifyPin = async (
-    pin: string,
-  ) => {
+  const verifyPin = async (pin: string) => {
     return devicePin === pin;
   };
 
@@ -409,12 +313,8 @@ export function AppSessionProvider({
    *
    * Still temporary.
    */
-  const startPasswordReset = (
-    email: string,
-  ) => {
-    setResetPasswordEmail(
-      email.trim().toLowerCase(),
-    );
+  const startPasswordReset = (email: string) => {
+    setResetPasswordEmail(email.trim().toLowerCase());
 
     setResetPasswordCode('');
     setResetPasswordVerified(false);
@@ -470,6 +370,7 @@ export function AppSessionProvider({
         completeWelcome,
 
         biometricEnabled,
+        startPhoneVerification,
         pinCreated,
         isAppUnlocked,
 
@@ -499,13 +400,10 @@ export function AppSessionProvider({
 }
 
 export function useAppSession() {
-  const context =
-    useContext(AppSessionContext);
+  const context = useContext(AppSessionContext);
 
   if (!context) {
-    throw new Error(
-      'useAppSession must be used inside AppSessionProvider',
-    );
+    throw new Error('useAppSession must be used inside AppSessionProvider');
   }
 
   return context;
