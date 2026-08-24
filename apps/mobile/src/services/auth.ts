@@ -6,9 +6,7 @@ export type SignUpPayload = {
   password: string;
 };
 
-export type PhoneAuthMode =
-  | 'sign-in'
-  | 'sign-up';
+export type PhoneAuthMode = 'sign-in' | 'sign-up';
 
 export async function signUpWithEmail({
   username,
@@ -53,33 +51,66 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function requestPhoneAuth(
-  phone: string,
-  mode: PhoneAuthMode,
-) {
-  const { error } =
-    await supabase.auth.signInWithOtp({
-      phone: phone.trim(),
+export async function requestPhoneAuth(phone: string, mode: PhoneAuthMode) {
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: phone.trim(),
 
-      options: {
-        shouldCreateUser:
-          mode === 'sign-up',
-      },
-    });
+    options: {
+      shouldCreateUser: mode === 'sign-up',
+    },
+  });
 
   if (error) {
     throw error;
   }
 }
 
-/**
- * User is already authenticated through
- * email/password at this point.
- *
- * This attaches the phone number to that
- * existing Supabase account and triggers
- * the phone verification OTP.
- */
+export async function requestPasswordReset(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function verifyPasswordRecoveryCode(email: string, token: string) {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: 'recovery',
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.session) {
+    throw new Error('Unable to start password recovery session.');
+  }
+
+  return data;
+}
+
+export async function updateRecoveredPassword(password: string) {
+  const { error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const { error: signOutError } = await supabase.auth.signOut({
+    scope: 'global',
+  });
+
+  if (signOutError) {
+    throw signOutError;
+  }
+}
+
 export async function requestPhoneVerification(phone: string) {
   const normalizedPhone = phone.trim();
 
@@ -160,4 +191,61 @@ export async function signOut() {
   if (error) {
     throw error;
   }
+}
+
+export async function verifyPhoneAuthOtp(
+  phone: string,
+  token: string,
+) {
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth
+      .verifyOtp({
+        phone:
+          phone.trim(),
+
+        token:
+          token.trim(),
+
+        type: 'sms',
+      });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.session) {
+    throw new Error(
+      'Unable to start phone authentication session.',
+    );
+  }
+
+  return data;
+}
+
+export async function completePhoneSignUpProfile(
+  username: string,
+) {
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth
+      .updateUser({
+        data: {
+          username:
+            username.trim(),
+
+          has_seen_welcome:
+            false,
+        },
+      });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }

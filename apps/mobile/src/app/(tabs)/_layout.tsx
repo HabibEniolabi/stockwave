@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Redirect, Tabs, router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -8,68 +7,77 @@ import SwapTabIcon from '../../assets/icons/SwapTabIcon';
 import MarketTabIcon from '../../assets/icons/MarketTabIcon';
 import ProfileTabIcon from '../../assets/icons/ProfileTabIcon';
 
-import { useAppSession } from '../../context/AppSessionContext';
-import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
+import { BiometricSetupModal } from
+  '../../components/modals/BiometricSetupModal';
+
+import { useAppSession } from
+  '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
   const {
+    isSessionReady,
+    isDeviceSecurityReady,
+
     isAuthenticated,
+    isPhoneVerified,
     hasSeenWelcome,
+
+    pendingPhone,
+
     pinCreated,
     isAppUnlocked,
-    isSessionReady,
-    isPhoneVerified,
   } = useAppSession();
-  const [showSecuritySetup, setShowSecuritySetup] = useState(false);
 
-  useEffect(() => {
-  const canStartSecuritySetup =
-    isSessionReady &&
-    isAuthenticated &&
-    isPhoneVerified &&
-    hasSeenWelcome &&
-    !pinCreated;
-
-  if (!canStartSecuritySetup) {
-    setShowSecuritySetup(false);
-    return;
-  }
-
-  const timer = setTimeout(() => {
-    setShowSecuritySetup(true);
-  }, 700);
-
-  return () => {
-    clearTimeout(timer);
-  };
-}, [
-  isSessionReady,
-  isAuthenticated,
-  isPhoneVerified,
-  hasSeenWelcome,
-  pinCreated,
-]);
-
-  if (!isSessionReady) {
+  if (
+    !isSessionReady ||
+    !isDeviceSecurityReady
+  ) {
     return null;
   }
 
   if (!isAuthenticated) {
-    return <Redirect href="/(auth)/sign-in" />;
-  }
-
-  if (!hasSeenWelcome) {
-    return <Redirect href="/(auth)/WelcomeScreen" />;
+    return (
+      <Redirect
+        href="/(auth)/sign-in"
+      />
+    );
   }
 
   if (!isPhoneVerified) {
-    return <Redirect href="/(auth)/OtpVerificationScreen" />;
+    return (
+      <Redirect
+        href={
+          pendingPhone
+            ? '/(auth)/OtpVerificationScreen'
+            : '/(auth)/PhoneNumberScreen'
+        }
+      />
+    );
   }
 
-  if (pinCreated && !isAppUnlocked) {
-    return <Redirect href="/(security)/UnlockPinScreen" />;
+  if (!hasSeenWelcome) {
+    return (
+      <Redirect
+        href="/(auth)/WelcomeScreen"
+      />
+    );
   }
+
+  if (
+    pinCreated &&
+    !isAppUnlocked
+  ) {
+    return (
+      <Redirect
+        href="/(security)/UnlockPinScreen"
+      />
+    );
+  }
+
+  const needsSecuritySetup =
+    !pinCreated;
 
   return (
     <>
@@ -79,12 +87,20 @@ export default function TabsLayout() {
 
           tabBarShowLabel: false,
 
-          tabBarActiveTintColor: colors.neutral[800],
-          tabBarInactiveTintColor: colors.neutral[400],
+          tabBarActiveTintColor:
+            colors.neutral[800],
 
-          tabBarStyle: styles.tabBar,
-          tabBarItemStyle: styles.tabBarItem,
-          tabBarIconStyle: styles.tabBarIcon,
+          tabBarInactiveTintColor:
+            colors.neutral[400],
+
+          tabBarStyle:
+            styles.tabBar,
+
+          tabBarItemStyle:
+            styles.tabBarItem,
+
+          tabBarIconStyle:
+            styles.tabBarIcon,
         }}
       >
         <Tabs.Screen
@@ -92,8 +108,15 @@ export default function TabsLayout() {
           options={{
             title: 'Home',
 
-            tabBarIcon: ({ color, focused }) => (
-              <HomeTabIcon size={30} color={color} focused={focused} />
+            tabBarIcon: ({
+              color,
+              focused,
+            }) => (
+              <HomeTabIcon
+                size={30}
+                color={color}
+                focused={focused}
+              />
             ),
           }}
         />
@@ -103,8 +126,15 @@ export default function TabsLayout() {
           options={{
             title: 'Portfolio',
 
-            tabBarIcon: ({ color, focused }) => (
-              <PortfolioTabIcon size={30} color={color} focused={focused} />
+            tabBarIcon: ({
+              color,
+              focused,
+            }) => (
+              <PortfolioTabIcon
+                size={30}
+                color={color}
+                focused={focused}
+              />
             ),
           }}
         />
@@ -115,8 +145,17 @@ export default function TabsLayout() {
             title: 'Swap',
 
             tabBarIcon: () => (
-              <View style={styles.swapButton}>
-                <SwapTabIcon size={24} color={colors.other.white} />
+              <View
+                style={
+                  styles.swapButton
+                }
+              >
+                <SwapTabIcon
+                  size={24}
+                  color={
+                    colors.other.white
+                  }
+                />
               </View>
             ),
           }}
@@ -127,8 +166,15 @@ export default function TabsLayout() {
           options={{
             title: 'Market',
 
-            tabBarIcon: ({ color, focused }) => (
-              <MarketTabIcon size={30} color={color} focused={focused} />
+            tabBarIcon: ({
+              color,
+              focused,
+            }) => (
+              <MarketTabIcon
+                size={30}
+                color={color}
+                focused={focused}
+              />
             ),
           }}
         />
@@ -138,54 +184,72 @@ export default function TabsLayout() {
           options={{
             title: 'Profile',
 
-            tabBarIcon: ({ color, focused }) => (
-              <ProfileTabIcon size={30} color={color} focused={focused} />
+            tabBarIcon: ({
+              color,
+              focused,
+            }) => (
+              <ProfileTabIcon
+                size={30}
+                color={color}
+                focused={focused}
+              />
             ),
           }}
         />
       </Tabs>
+
       <BiometricSetupModal
-        visible={showSecuritySetup && !pinCreated}
+        visible={
+          needsSecuritySetup
+        }
         onContinueToPin={() => {
-          setShowSecuritySetup(false);
-          router.replace('/(security)/CreatePinScreen');
+          router.replace(
+            '/(security)/CreatePinScreen',
+          );
         }}
       />
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  tabBar: {
-    height: 67,
-    paddingTop: 8,
-    paddingBottom: 10,
-    paddingHorizontal: 22,
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral[50],
-    backgroundColor: colors.other.white,
-  },
+const styles =
+  StyleSheet.create({
+    tabBar: {
+      height: 67,
+      paddingTop: 8,
+      paddingBottom: 10,
+      paddingHorizontal: 22,
 
-  tabBarItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-  },
+      borderTopWidth: 1,
 
-  tabBarIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+      borderTopColor:
+        colors.neutral[50],
 
-  swapButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+      backgroundColor:
+        colors.other.white,
+    },
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    tabBarItem: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 0,
+    },
 
-    backgroundColor: colors.primary[100],
-  },
-});
+    tabBarIcon: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    swapButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+
+      alignItems: 'center',
+      justifyContent: 'center',
+
+      backgroundColor:
+        colors.primary[100],
+    },
+  });

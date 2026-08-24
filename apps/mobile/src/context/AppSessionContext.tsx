@@ -11,21 +11,34 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 import {
+  completePhoneSignUpProfile,
   markWelcomeSeen,
+  requestPasswordReset,
+  requestPhoneAuth,
   requestPhoneVerification,
   resendPhoneVerification,
   signInWithEmail,
   signOut,
   signUpWithEmail,
-  type SignUpPayload,
+  updateRecoveredPassword,
+  verifyPasswordRecoveryCode,
+  verifyPhoneAuthOtp,
   verifyPhoneChange,
-  requestPhoneAuth,
+  type SignUpPayload,
 } from '../services/auth';
 
+import {
+  clearDeviceSecurity,
+  getDeviceBiometricsEnabled,
+  hasDevicePin,
+  saveDevicePin,
+  setDeviceBiometricsEnabled,
+  verifyDevicePin,
+} from '../services/deviceSecurity';
+
+type PhoneAuthMode = 'sign-in' | 'sign-up';
+
 type AppSessionContextValue = {
-  /*
-   * Supabase authentication
-   */
   session: Session | null;
   user: User | null;
 
@@ -37,16 +50,27 @@ type AppSessionContextValue = {
   pendingPhone: string;
 
   signIn: (email: string, password: string) => Promise<void>;
+
   signUp: (payload: SignUpPayload) => Promise<void>;
+
   startPhoneVerification: (phone: string) => Promise<void>;
+
   verifyPhoneCode: (code: string) => Promise<void>;
+
   resendPhoneCode: () => Promise<void>;
-  startPhoneAuth: (phone: string, mode: 'sign-in' | 'sign-up') => Promise<void>;
+
+  startPhoneAuth: (phone: string, mode: PhoneAuthMode) => Promise<void>;
+
+  verifyPhoneAuth: (
+    phone: string,
+    code: string,
+    mode: PhoneAuthMode,
+    username?: string,
+  ) => Promise<void>;
+
   completeWelcome: () => Promise<void>;
 
-  /*
-   * Device security
-   */
+  isDeviceSecurityReady: boolean;
   biometricEnabled: boolean;
   pinCreated: boolean;
   isAppUnlocked: boolean;
@@ -58,26 +82,21 @@ type AppSessionContextValue = {
   unlockApp: () => void;
   lockApp: () => void;
 
-  enableBiometrics: () => void;
+  enableBiometrics: () => Promise<void>;
 
-  /*
-   * Password reset
-   *
-   * Still temporary. We will wire Supabase
-   * password recovery separately.
-   */
   resetPasswordEmail: string;
-  resetPasswordCode: string;
   resetPasswordVerified: boolean;
 
-  startPasswordReset: (email: string) => void;
-  setResetPasswordCode: (code: string) => void;
-  verifyPasswordResetCode: () => void;
-  completePasswordReset: () => void;
+  startPasswordReset: (email: string) => Promise<void>;
 
-  /*
-   * Logout / development reset
-   */
+  resendPasswordResetCode: () => Promise<void>;
+
+  verifyPasswordResetCode: (code: string) => Promise<void>;
+
+  completePasswordReset: (password: string) => Promise<void>;
+
+  signOutCurrentDevice: () => Promise<void>;
+
   resetSession: () => Promise<void>;
 };
 
@@ -90,9 +109,6 @@ type AppSessionProviderProps = {
 };
 
 export function AppSessionProvider({ children }: AppSessionProviderProps) {
-  /*
-   * Supabase session
-   */
   const [session, setSession] = useState<Session | null>(null);
 
   const [isSessionReady, setIsSessionReady] = useState(false);
@@ -101,27 +117,15 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
   const [pendingPhone, setPendingPhone] = useState('');
 
-  /*
-   * Device security
-   *
-   * Still local development state.
-   * We'll persist this properly after
-   * authentication is stable.
-   */
+  const [isDeviceSecurityReady, setIsDeviceSecurityReady] = useState(false);
+
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const [pinCreated, setPinCreated] = useState(false);
 
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
 
-  const [devicePin, setDevicePin] = useState<string | null>(null);
-
-  /*
-   * Password reset temporary state
-   */
   const [resetPasswordEmail, setResetPasswordEmail] = useState('');
-
-  const [resetPasswordCode, setResetPasswordCode] = useState('');
 
   const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
 
@@ -131,10 +135,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
   const isPhoneVerified = Boolean(user?.phone_confirmed_at);
 
-  /*
-   * Sync context state from whatever
-   * Supabase says the current session is.
-   */
   const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
 
@@ -143,6 +143,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     if (!nextUser) {
       setHasSeenWelcome(false);
       setPendingPhone('');
+
       return;
     }
 
@@ -152,13 +153,11 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
     if (typeof registrationPhone === 'string') {
       setPendingPhone(registrationPhone);
+    } else {
+      setPendingPhone('');
     }
   };
 
-  /*
-   * Restore persisted Supabase session
-   * when StockWave launches.
-   */
   useEffect(() => {
     let mounted = true;
 
@@ -174,6 +173,13 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       }
 
       syncSession(data.session);
+
+      /*
+       * A restored session does not
+       * automatically unlock the app.
+       */
+      setIsAppUnlocked(false);
+
       setIsSessionReady(true);
     };
 
@@ -187,33 +193,89 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       }
 
       syncSession(nextSession);
+
       setIsSessionReady(true);
     });
 
     return () => {
       mounted = false;
+
       subscription.unsubscribe();
     };
   }, []);
 
-  /*
-   * Email/password sign in
-   */
+  useEffect(() => {
+    let active = true;
+
+    const restoreDeviceSecurity = async () => {
+      if (!isSessionReady) {
+        return;
+      }
+
+      setIsDeviceSecurityReady(false);
+
+      if (!user) {
+        if (!active) {
+          return;
+        }
+
+        setPinCreated(false);
+
+        setBiometricEnabled(false);
+
+        setIsAppUnlocked(false);
+
+        setIsDeviceSecurityReady(true);
+
+        return;
+      }
+
+      try {
+        const [hasPin, biometricsEnabled] = await Promise.all([
+          hasDevicePin(user.id),
+
+          getDeviceBiometricsEnabled(user.id),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setPinCreated(hasPin);
+
+        setBiometricEnabled(biometricsEnabled);
+      } catch (error) {
+        console.error('Unable to restore device security:', error);
+
+        if (!active) {
+          return;
+        }
+
+        setPinCreated(false);
+
+        setBiometricEnabled(false);
+      } finally {
+        if (active) {
+          setIsDeviceSecurityReady(true);
+        }
+      }
+    };
+
+    void restoreDeviceSecurity();
+
+    return () => {
+      active = false;
+    };
+  }, [isSessionReady, user?.id]);
+
   const signIn = async (email: string, password: string) => {
     const data = await signInWithEmail(email, password);
 
     syncSession(data.session);
 
-    /*
-     * Full credential authentication starts
-     * the current device session unlocked.
-     */
     setIsAppUnlocked(true);
   };
 
-  /*
-   * Email/password registration
-   */
   const signUp = async (payload: SignUpPayload) => {
     const data = await signUpWithEmail(payload);
 
@@ -234,9 +296,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setPendingPhone(normalizedPhone);
   };
 
-  /*
-   * Phone verification
-   */
   const verifyPhoneCode = async (code: string) => {
     if (!pendingPhone) {
       throw new Error('No phone number is currently being verified.');
@@ -251,6 +310,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     }
 
     syncSession(data.session);
+
     setPendingPhone('');
   };
 
@@ -262,32 +322,77 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     await resendPhoneVerification(pendingPhone);
   };
 
-  /*
-   * Welcome completion
-   */
+  const startPhoneAuth = async (phone: string, mode: PhoneAuthMode) => {
+    const normalizedPhone = phone.trim();
+
+    if (!normalizedPhone) {
+      throw new Error('Phone number is required.');
+    }
+
+    await requestPhoneAuth(normalizedPhone, mode);
+  };
+
+  const verifyPhoneAuth = async (
+    phone: string,
+    code: string,
+    mode: PhoneAuthMode,
+    username?: string,
+  ) => {
+    const normalizedPhone = phone.trim();
+
+    if (!normalizedPhone) {
+      throw new Error('Phone number is required.');
+    }
+
+    const data = await verifyPhoneAuthOtp(normalizedPhone, code);
+
+    syncSession(data.session);
+
+    if (mode === 'sign-up') {
+      const normalizedUsername = username?.trim();
+
+      if (!normalizedUsername) {
+        throw new Error('Username is required.');
+      }
+
+      await completePhoneSignUpProfile(normalizedUsername);
+
+      const { data: refreshedSession, error } =
+        await supabase.auth.refreshSession();
+
+      if (error) {
+        throw error;
+      }
+
+      syncSession(refreshedSession.session);
+    }
+
+    setIsAppUnlocked(true);
+  };
+
   const completeWelcome = async () => {
     await markWelcomeSeen();
 
-    /*
-     * Set immediately so navigation does not
-     * race the Supabase USER_UPDATED event.
-     */
     setHasSeenWelcome(true);
   };
 
-  /*
-   * PIN
-   *
-   * Development implementation.
-   */
   const createPin = async (pin: string) => {
-    setDevicePin(pin);
+    if (!user) {
+      throw new Error('An authenticated user is required to create a PIN.');
+    }
+
+    await saveDevicePin(user.id, pin);
+
     setPinCreated(true);
     setIsAppUnlocked(true);
   };
 
   const verifyPin = async (pin: string) => {
-    return devicePin === pin;
+    if (!user) {
+      return false;
+    }
+
+    return verifyDevicePin(user.id, pin);
   };
 
   const unlockApp = () => {
@@ -298,52 +403,108 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsAppUnlocked(false);
   };
 
-  const enableBiometrics = () => {
+  const enableBiometrics = async () => {
+    if (!user) {
+      throw new Error(
+        'An authenticated user is required to enable biometrics.',
+      );
+    }
+
+    await setDeviceBiometricsEnabled(user.id, true);
+
     setBiometricEnabled(true);
   };
 
-  /*
-   * Password reset
-   *
-   * Still temporary.
-   */
-  const startPasswordReset = (email: string) => {
-    setResetPasswordEmail(email.trim().toLowerCase());
+  const startPasswordReset = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
 
-    setResetPasswordCode('');
+    if (!normalizedEmail) {
+      throw new Error('Email address is required.');
+    }
+
+    await requestPasswordReset(normalizedEmail);
+
+    setResetPasswordEmail(normalizedEmail);
+
     setResetPasswordVerified(false);
   };
 
-  const verifyPasswordResetCode = () => {
+  const resendPasswordResetCode = async () => {
+    if (!resetPasswordEmail) {
+      throw new Error('No password reset is currently in progress.');
+    }
+
+    await requestPasswordReset(resetPasswordEmail);
+  };
+
+  const verifyPasswordResetCode = async (code: string) => {
+    if (!resetPasswordEmail) {
+      throw new Error('No password reset is currently in progress.');
+    }
+
+    await verifyPasswordRecoveryCode(resetPasswordEmail, code);
+
     setResetPasswordVerified(true);
   };
 
-  const completePasswordReset = () => {
+  const completePasswordReset = async (password: string) => {
+    if (!resetPasswordVerified) {
+      throw new Error('Password recovery has not been verified.');
+    }
+
+    await updateRecoveredPassword(password);
+
     setResetPasswordEmail('');
-    setResetPasswordCode('');
+
     setResetPasswordVerified(false);
+
+    setIsAppUnlocked(false);
   };
 
-  /*
-   * Supabase logout + local device state reset.
-   */
+  const signOutCurrentDevice = async () => {
+    const userId = user?.id;
+
+    if (userId) {
+      await clearDeviceSecurity(userId);
+    }
+
+    const { error } = await supabase.auth.signOut({
+      scope: 'local',
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    syncSession(null);
+
+    setPinCreated(false);
+
+    setBiometricEnabled(false);
+
+    setIsAppUnlocked(false);
+  };
+
   const resetSession = async () => {
+    const userId = user?.id;
+
+    if (userId) {
+      await clearDeviceSecurity(userId);
+    }
+
     await signOut();
 
     syncSession(null);
 
-    setBiometricEnabled(false);
     setPinCreated(false);
+
+    setBiometricEnabled(false);
+
     setIsAppUnlocked(false);
-    setDevicePin(null);
 
     setResetPasswordEmail('');
-    setResetPasswordCode('');
-    setResetPasswordVerified(false);
-  };
 
-  const startPhoneAuth = async (phone: string, mode: 'sign-in' | 'sign-up') => {
-    await requestPhoneAuth(phone, mode);
+    setResetPasswordVerified(false);
   };
 
   return (
@@ -362,15 +523,17 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         signIn,
         signUp,
 
+        startPhoneVerification,
         verifyPhoneCode,
         resendPhoneCode,
 
         startPhoneAuth,
+        verifyPhoneAuth,
 
         completeWelcome,
 
+        isDeviceSecurityReady,
         biometricEnabled,
-        startPhoneVerification,
         pinCreated,
         isAppUnlocked,
 
@@ -383,13 +546,14 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         enableBiometrics,
 
         resetPasswordEmail,
-        resetPasswordCode,
         resetPasswordVerified,
 
         startPasswordReset,
-        setResetPasswordCode,
+        resendPasswordResetCode,
         verifyPasswordResetCode,
         completePasswordReset,
+
+        signOutCurrentDevice,
 
         resetSession,
       }}
