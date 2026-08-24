@@ -20,7 +20,6 @@ import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
 import { SocialSignIn } from '../../components/ui/SocianSignin';
 import { useAppSession } from '../../context/AppSessionContext';
-import { signInWithEmail } from '../../services/auth';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -30,13 +29,33 @@ export default function SignInScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const { completeSignIn, isAuthenticated, hasSeenWelcome } = useAppSession();
+  const { signIn, isPhoneVerified, isAuthenticated, hasSeenWelcome } = useAppSession();
 
   useEffect(() => {
-    if (isAuthenticated && hasSeenWelcome) {
-      router.replace('/(tabs)/home');
+     if (!isAuthenticated) {
+      return;
     }
-  }, [isAuthenticated, hasSeenWelcome]);
+
+    setIsSigningIn(false);
+
+    if (!isPhoneVerified) {
+      router.replace(
+        '/(auth)/OtpVerificationScreen',
+      );
+
+      return;
+    }
+
+    if (!isPhoneVerified) {
+      router.replace(
+        '/(auth)/OtpVerificationScreen',
+      );
+
+      return;
+    }
+      router.replace('/(tabs)/home');
+
+  }, [isAuthenticated, hasSeenWelcome, isPhoneVerified]);
 
   const handleSignIn = async () => {
     if (isSigningIn) {
@@ -71,16 +90,11 @@ export default function SignInScreen() {
     try {
     setIsSigningIn(true);
 
-    await signInWithEmail(
+    await signIn(
       normalizedEmail,
       password,
     );
 
-    // Do NOT call completeSignIn().
-    // Do NOT manually set isAuthenticated.
-    //
-    // AppSessionContext will receive the
-    // Supabase auth state change.
   } catch (error) {
     const message =
       error instanceof Error

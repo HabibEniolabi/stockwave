@@ -10,9 +10,9 @@ import {
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
 import { useFonts } from 'expo-font';
-import { AppSessionProvider } from '../context/AppSessionContext';
 
-import { registerSupabaseAuthLifecycle } from '../lib/supabase';
+import { AppSessionProvider } from '../../context/AppSessionContext';
+import { registerSupabaseAuthLifecycle } from '../../lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +27,7 @@ const Layout = () => {
 
   useEffect(() => {
     const cleanup = registerSupabaseAuthLifecycle();
+
     return cleanup;
   }, []);
 
@@ -47,9 +48,11 @@ const Layout = () => {
   if (!fontsLoaded) {
     return null;
   }
+
   return (
     <AppSessionProvider>
       <StatusBar style="dark" />
+
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
