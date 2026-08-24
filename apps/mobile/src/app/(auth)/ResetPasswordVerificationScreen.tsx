@@ -1,24 +1,24 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Redirect, router } from 'expo-router';
+
+import { useState } from 'react';
+
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthHeader from '../../components/common/AuthHeader';
-import {
-  OtpInput,
-  type OtpStatus,
-} from '../../components/form/OtpInput';
+
+import { OtpInput, type OtpStatus } from '../../components/form/OtpInput';
+
 import { BackButton } from '../../components/ui/BackButton';
+
 import { Button } from '../../components/ui/Button';
-import { OtpPreviewModal } from '../../components/ui/OtpPreviewModal';
+
 import { useAppSession } from '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+
 import { getTypography } from '../../theme/typography';
 
 const OTP_LENGTH = 6;
@@ -26,69 +26,94 @@ const OTP_LENGTH = 6;
 export default function ResetPasswordVerificationScreen() {
   const {
     resetPasswordEmail,
-    setResetPasswordCode,
+
     verifyPasswordResetCode,
+    resendPasswordResetCode,
   } = useAppSession();
 
   const [code, setCode] = useState('');
-  const [generatedOtp, setGeneratedOtp] =
-    useState('');
 
-  const [status, setStatus] =
-    useState<OtpStatus>('default');
+  const [status, setStatus] = useState<OtpStatus>('default');
 
-  const [shakeTrigger, setShakeTrigger] =
-    useState(0);
+  const [shakeTrigger, setShakeTrigger] = useState(0);
 
   const [error, setError] = useState('');
-  const [isVerifying, setIsVerifying] =
-    useState(false);
 
-  const [modalVisible, setModalVisible] =
-    useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  useEffect(() => {
-    setModalVisible(true);
-  }, []);
+  const [isResending, setIsResending] = useState(false);
 
-  const handleVerify = () => {
-    if (isVerifying) {
+  if (!resetPasswordEmail) {
+    return <Redirect href="/(auth)/forgot-password" />;
+  }
+
+  const verifyCode = async (value: string) => {
+    if (isVerifying || value.length !== OTP_LENGTH) {
       return;
     }
 
-    if (code.length !== OTP_LENGTH) {
-      setStatus('error');
-      setShakeTrigger((current) => current + 1);
-      setError('Enter the 6-digit verification code.');
-      return;
-    }
+    try {
+      setIsVerifying(true);
+      setError('');
+      setStatus('default');
 
-    setIsVerifying(true);
-    setError('');
-
-    setTimeout(() => {
-      if (code !== generatedOtp) {
-        setStatus('error');
-        setShakeTrigger((current) => current + 1);
-        setError(
-          'The verification code is incorrect.',
-        );
-        setIsVerifying(false);
-        return;
-      }
+      await verifyPasswordResetCode(value);
 
       setStatus('success');
+
       setShakeTrigger((current) => current + 1);
 
-      setResetPasswordCode(code);
-      verifyPasswordResetCode();
-
       setTimeout(() => {
-        router.replace(
-          '/(auth)/CreateNewPasswordScreen',
-        );
-      }, 800);
-    }, 600);
+        router.replace('/(auth)/CreateNewPasswordScreen');
+      }, 500);
+    } catch (error) {
+      setStatus('error');
+
+      setShakeTrigger((current) => current + 1);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'The verification code is invalid or expired.',
+      );
+
+      setIsVerifying(false);
+    }
+  };
+
+  const handleCodeChange = (value: string) => {
+    setCode(value);
+
+    setStatus('default');
+    setError('');
+
+    if (value.length === OTP_LENGTH) {
+      void verifyCode(value);
+    }
+  };
+
+  const handleResend = async () => {
+    if (isResending) {
+      return;
+    }
+
+    try {
+      setIsResending(true);
+
+      setCode('');
+      setError('');
+      setStatus('default');
+
+      await resendPasswordResetCode();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to resend verification code.',
+      );
+    } finally {
+      setIsResending(false);
+    }
   };
 
   return (
@@ -99,9 +124,7 @@ export default function ResetPasswordVerificationScreen() {
         <View style={styles.content}>
           <AuthHeader
             title="Enter verification code"
-            description={
-              `We sent a 6-digit verification code to\n${resetPasswordEmail}`
-            }
+            description={`We sent a 6-digit verification code to\n${resetPasswordEmail}`}
           />
 
           <OtpInput
@@ -110,47 +133,34 @@ export default function ResetPasswordVerificationScreen() {
             status={status}
             shakeTrigger={shakeTrigger}
             disabled={isVerifying}
-            onChangeText={(value) => {
-              setCode(value);
-              setStatus('default');
-              setError('');
-            }}
+            onChangeText={handleCodeChange}
           />
 
-          {error ? (
-            <Text style={styles.error}>
-              {error}
-            </Text>
-          ) : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            onPress={() => setModalVisible(true)}
+            disabled={isResending}
+            hitSlop={8}
+            onPress={() => {
+              void handleResend();
+            }}
           >
             <Text style={styles.resend}>
-              Resend code
+              {isResending ? 'Resending...' : 'Resend code'}
             </Text>
           </Pressable>
         </View>
 
         <Button
-          title={
-            isVerifying
-              ? 'Verifying...'
-              : 'Verify code'
-          }
+          title={isVerifying ? 'Verifying...' : 'Verify code'}
+          variant="primary"
           loading={isVerifying}
           disabled={code.length !== OTP_LENGTH}
-          onPress={handleVerify}
+          onPress={() => {
+            void verifyCode(code);
+          }}
         />
       </View>
-
-      <OtpPreviewModal
-        visible={modalVisible}
-        length={OTP_LENGTH}
-        duration={6000}
-        onCodeGenerated={setGeneratedOtp}
-        onClose={() => setModalVisible(false)}
-      />
     </SafeAreaView>
   );
 }
@@ -176,12 +186,17 @@ const styles = StyleSheet.create({
 
   error: {
     ...getTypography('bodySmall'),
+
     color: colors.error.base,
+
     textAlign: 'center',
   },
 
   resend: {
     ...getTypography('bodyMedium', 'semiBold'),
+
     color: colors.primary[100],
+
+    textAlign: 'center',
   },
 });
