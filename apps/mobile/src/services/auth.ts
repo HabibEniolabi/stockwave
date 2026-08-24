@@ -6,6 +6,10 @@ export type SignUpPayload = {
   password: string;
 };
 
+export type PhoneAuthMode =
+  | 'sign-in'
+  | 'sign-up';
+
 export async function signUpWithEmail({
   username,
   email,
@@ -47,6 +51,25 @@ export async function signInWithEmail(email: string, password: string) {
   }
 
   return data;
+}
+
+export async function requestPhoneAuth(
+  phone: string,
+  mode: PhoneAuthMode,
+) {
+  const { error } =
+    await supabase.auth.signInWithOtp({
+      phone: phone.trim(),
+
+      options: {
+        shouldCreateUser:
+          mode === 'sign-up',
+      },
+    });
+
+  if (error) {
+    throw error;
+  }
 }
 
 /**

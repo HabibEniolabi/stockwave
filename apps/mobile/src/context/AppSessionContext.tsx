@@ -19,6 +19,7 @@ import {
   signUpWithEmail,
   type SignUpPayload,
   verifyPhoneChange,
+  requestPhoneAuth,
 } from '../services/auth';
 
 type AppSessionContextValue = {
@@ -36,15 +37,11 @@ type AppSessionContextValue = {
   pendingPhone: string;
 
   signIn: (email: string, password: string) => Promise<void>;
-
   signUp: (payload: SignUpPayload) => Promise<void>;
-
   startPhoneVerification: (phone: string) => Promise<void>;
-
   verifyPhoneCode: (code: string) => Promise<void>;
-
   resendPhoneCode: () => Promise<void>;
-
+  startPhoneAuth: (phone: string, mode: 'sign-in' | 'sign-up') => Promise<void>;
   completeWelcome: () => Promise<void>;
 
   /*
@@ -74,11 +71,8 @@ type AppSessionContextValue = {
   resetPasswordVerified: boolean;
 
   startPasswordReset: (email: string) => void;
-
   setResetPasswordCode: (code: string) => void;
-
   verifyPasswordResetCode: () => void;
-
   completePasswordReset: () => void;
 
   /*
@@ -348,6 +342,10 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setResetPasswordVerified(false);
   };
 
+  const startPhoneAuth = async (phone: string, mode: 'sign-in' | 'sign-up') => {
+    await requestPhoneAuth(phone, mode);
+  };
+
   return (
     <AppSessionContext.Provider
       value={{
@@ -366,6 +364,8 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
         verifyPhoneCode,
         resendPhoneCode,
+
+        startPhoneAuth,
 
         completeWelcome,
 

@@ -24,17 +24,32 @@ export default function TabsLayout() {
   const [showSecuritySetup, setShowSecuritySetup] = useState(false);
 
   useEffect(() => {
-    if (pinCreated) {
-      setShowSecuritySetup(false);
-      return;
-    }
+  const canStartSecuritySetup =
+    isSessionReady &&
+    isAuthenticated &&
+    isPhoneVerified &&
+    hasSeenWelcome &&
+    !pinCreated;
 
-    const timer = setTimeout(() => {
-      setShowSecuritySetup(true);
-    }, 700);
+  if (!canStartSecuritySetup) {
+    setShowSecuritySetup(false);
+    return;
+  }
 
-    return () => clearTimeout(timer);
-  }, [pinCreated]);
+  const timer = setTimeout(() => {
+    setShowSecuritySetup(true);
+  }, 700);
+
+  return () => {
+    clearTimeout(timer);
+  };
+}, [
+  isSessionReady,
+  isAuthenticated,
+  isPhoneVerified,
+  hasSeenWelcome,
+  pinCreated,
+]);
 
   if (!isSessionReady) {
     return null;
