@@ -16,13 +16,15 @@ import StockWave from '../../assets/icons/StockWave';
 import AuthHeader from '../../components/common/AuthHeader';
 import { TextField } from '../../components/form/TextField';
 import { Button } from '../../components/ui/Button';
-import { SocialSignIn } from '../../components/ui/SocianSignin';
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignin';
 
 import { useAppSession } from '../../context/AppSessionContext';
 
 import { spacing } from '../../theme/spacing';
 import { colors } from '../../theme/colors';
 import { getTypography } from '../../theme/typography';
+
+type Provider = 'google' | 'apple' | 'phone';
 
 export default function SignUpScreen() {
   const [username, setUsername] = useState('');
@@ -37,6 +39,8 @@ export default function SignUpScreen() {
   const [isSigningUp, setIsSigningUp] = useState(false);
 
   const { signUp } = useAppSession();
+
+  const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
 
   const handleContinue = async () => {
     if (isSigningUp) {
@@ -100,24 +104,12 @@ export default function SignUpScreen() {
     try {
       setIsSigningUp(true);
 
-      /*
-       * Creates the real Supabase account.
-       *
-       * signUp() in AppSessionContext delegates
-       * to signUpWithEmail() in the auth service.
-       */
       await signUp({
         username: normalizedUsername,
         email: normalizedEmail,
         password,
       });
 
-      /*
-       * The account now exists and the user has
-       * an authenticated Supabase session.
-       *
-       * Phone collection happens on the next screen.
-       */
       router.replace('/(auth)/PhoneNumberScreen');
     } catch (error) {
       console.error('SIGN UP ERROR', error);
@@ -133,28 +125,32 @@ export default function SignUpScreen() {
     }
   };
 
-  /*
-   * These become real Supabase OAuth handlers
-   * after the base email/phone flow is working.
-   */
   const handleGoogleSignUp = () => {
-    console.log('Continue with Google');
+    try {
+      setBusyProvider('google');
+
+      // Later:
+      // await signInWithGoogle();
+    } catch (error) {
+      console.error('Google sign up failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
   const handleAppleSignUp = () => {
-    console.log('Continue with Apple');
+    try {
+      setBusyProvider('apple');
+
+      // Later:
+      // await signInWithApple();
+    } catch (error) {
+      console.error('Apple sign up failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
-  /*
-   * This is different from PhoneNumberScreen.
-   *
-   * PhoneNumberScreen:
-   * Email/password user verifying their phone.
-   *
-   * PhoneAuthScreen:
-   * User creating/signing into an account using
-   * their phone number as the authentication method.
-   */
   const handlePhoneSignUp = () => {
     router.push({
       pathname: '/(auth)/PhoneAuthScreen',
@@ -276,10 +272,11 @@ export default function SignUpScreen() {
               onPress={handleContinue}
             />
 
-            <SocialSignIn
+            <AlternativeSignIn
               onGooglePress={handleGoogleSignUp}
               onApplePress={handleAppleSignUp}
               onPhonePress={handlePhoneSignUp}
+              busyProvider={busyProvider}
             />
           </View>
 

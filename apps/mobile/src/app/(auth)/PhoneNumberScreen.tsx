@@ -102,14 +102,7 @@ const handleContinue = async () => {
     );
     return;
   }
-
-  /*
-   * libphonenumber gives us the E.164 version:
-   *
-   * +2348012345678
-   *
-   * This is what we send to Supabase.
-   */
+  
   const internationalPhoneNumber =
     parsedPhoneNumber.number;
 
@@ -126,24 +119,10 @@ const handleContinue = async () => {
   try {
     setIsSubmitting(true);
 
-    /*
-     * AppSessionContext
-     *        ↓
-     * requestPhoneVerification()
-     *        ↓
-     * supabase.auth.updateUser({ phone })
-     *
-     * Supabase sends the real OTP.
-     */
     await startPhoneVerification(
       internationalPhoneNumber,
     );
 
-    /*
-     * No need to pass the phone number in
-     * route params because AppSessionContext
-     * now stores it as pendingPhone.
-     */
     router.push(
       '/(auth)/OtpVerificationScreen',
     );

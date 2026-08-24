@@ -41,11 +41,6 @@ export default function OtpVerificationScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  /*
-   * Because the initial OTP was just sent from
-   * PhoneNumberScreen, don't immediately allow
-   * another request.
-   */
   const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN);
 
   const { pendingPhone, verifyPhoneCode, resendPhoneCode } = useAppSession();
@@ -73,11 +68,7 @@ export default function OtpVerificationScreen() {
     };
   }, [resendCooldown]);
 
-  /*
-   * Verify OTP with Supabase.
-   *
-   * No local/generated OTP comparison anymore.
-   */
+ 
   const verifyCode = async (code: string) => {
     if (isVerifying || code.length !== OTP_LENGTH) {
       return;
@@ -97,17 +88,6 @@ export default function OtpVerificationScreen() {
       setOtpStatus('default');
       setIsVerifying(true);
 
-      /*
-       * AppSessionContext
-       *      ↓
-       * verifyPhoneChange()
-       *      ↓
-       * supabase.auth.verifyOtp({
-       *   phone,
-       *   token: code,
-       *   type: 'phone_change'
-       * })
-       */
       await verifyPhoneCode(code);
 
       setOtpStatus('success');
@@ -175,9 +155,7 @@ export default function OtpVerificationScreen() {
     void verifyCode(verificationCode);
   };
 
-  /*
-   * This is where resend belongs.
-   */
+  
   const handleResendCode = async () => {
     if (isResending || resendCooldown > 0) {
       return;
@@ -199,16 +177,6 @@ export default function OtpVerificationScreen() {
       setError('');
       setOtpStatus('default');
 
-      /*
-       * AppSessionContext
-       *      ↓
-       * resendPhoneVerification()
-       *      ↓
-       * supabase.auth.resend({
-       *   type: 'phone_change',
-       *   phone
-       * })
-       */
       await resendPhoneCode();
 
       /*

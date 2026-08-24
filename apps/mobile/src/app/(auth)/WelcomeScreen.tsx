@@ -9,23 +9,30 @@ import { getTypography } from '../../theme/typography';
 import { ConfettiAnimation } from '../../components/animations/ConfettiAnimation';
 import { StockWaveSuccessMark } from '../../components/branding/StockWaveSuccessMark';
 import { useAppSession } from '../../context/AppSessionContext';
+import { useState } from 'react';
 
 export default function WelcomeScreen() {
-  const {
-    completeWelcome,
-    isAuthenticated,
-    hasSeenWelcome
-  } = useAppSession();
+  const { completeWelcome, user } = useAppSession();
 
-  console.log('WELCOME SESSION', {
-    isAuthenticated,
-    hasSeenWelcome,
-  });
+  const [isCompleting, setIsCompleting] = useState(false);
 
-  const handleContinue = () => {
-    completeWelcome();
+  const username = user?.user_metadata?.username;
 
-    router.replace('/(tabs)/home');
+  const handleContinue = async () => {
+    if (isCompleting) {
+      return;
+    }
+
+    try {
+      setIsCompleting(true);
+      await completeWelcome();
+
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      console.error('Unable to complete welcome', error);
+
+      setIsCompleting(false);
+    }
   };
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -33,7 +40,7 @@ export default function WelcomeScreen() {
         icon={<StockWaveSuccessMark size={96} />}
         title={
           <Text style={styles.title}>
-            {' Hello Agatha Bella! 👋\nWelcome to StockWave'}
+            {`Hello ${username}! 👋\nWelcome to StockWave`}
           </Text>
         }
         confetti={<ConfettiAnimation />}

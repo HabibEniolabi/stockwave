@@ -3,73 +3,73 @@ import type { ReactNode } from 'react';
 
 import Apple from '../../assets/icons/Apple';
 import Google from '../../assets/icons/Google';
-import { Button } from '../ui/Button';
+
+import { Button } from './Button';
+import { AppIcon } from '../icons/AppIcon';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import { AppIcon } from '../icons/AppIcon';
 
-type SocialProvider = {
-  id: string;
+type AlternativeProviderId = 'google' | 'apple' | 'phone';
+
+type AlternativeProvider = {
+  id: AlternativeProviderId;
   title: string;
   icon: ReactNode;
   onPress: () => void;
 };
 
-type SocialSignInProps = {
+type AlternativeSignInProps = {
   onGooglePress: () => void;
   onApplePress: () => void;
   onPhonePress: () => void;
-  /** Blocks both buttons while a sign-in is mid-flight. */
-  busyProvider?: string | null;
+
+  busyProvider?: AlternativeProviderId | null;
 };
 
-export function SocialSignIn({
+export function AlternativeSignIn({
   onGooglePress,
   onApplePress,
   onPhonePress,
   busyProvider = null,
-}: SocialSignInProps) {
-  /**
-   * Android gets Google alone, on purpose. A Google account is required to use
-   * the Play Store, so a second provider adds no coverage — it only adds ways
-   * for one person to end up with two accounts, which in a money app is a
-   * support problem, not a design flourish.
-   *
-   * iOS gets Apple because App Store review requires it alongside any other
-   * third-party sign-in.
-   */
-  const providers: SocialProvider[] = [
+}: AlternativeSignInProps) {
+  const providers: AlternativeProvider[] = [
     {
       id: 'google',
       title: 'Continue with Google',
       icon: <Google width={24} height={24} />,
       onPress: onGooglePress,
     },
+
     ...(Platform.OS === 'ios'
       ? [
           {
-            id: 'apple',
+            id: 'apple' as const,
             title: 'Continue with Apple',
             icon: <Apple width={24} height={24} />,
             onPress: onApplePress,
           },
         ]
       : [
-        {
-          id: 'phone',
-          title: 'Continue with Phone',
-          icon: <AppIcon name="phone" size={26} color={colors.neutral[900]} />,
-          onPress: onPhonePress,
-        },
-      ]),
+          {
+            id: 'phone' as const,
+            title: 'Continue with Phone',
+            icon: (
+              <AppIcon name="phone" size={26} color={colors.neutral[900]} />
+            ),
+            onPress: onPhonePress,
+          },
+        ]),
   ];
 
   return (
     <View>
       <View style={styles.divider}>
         <View style={styles.rule} />
+
         <Text style={styles.dividerLabel}>Or continue with</Text>
+
         <View style={styles.rule} />
       </View>
 
@@ -109,11 +109,6 @@ const styles = StyleSheet.create({
     color: colors.neutral[500],
   },
 
-  /**
-   * `gap` rather than `space-between` or fixed heights — the block sizes to
-   * however many providers it was handed, so Android's single button reads as
-   * deliberate instead of as a row with something missing.
-   */
   providers: {
     gap: spacing[3],
   },

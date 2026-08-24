@@ -18,8 +18,10 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import { SocialSignIn } from '../../components/ui/SocianSignin';
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignin';
 import { useAppSession } from '../../context/AppSessionContext';
+
+  type Provider = 'google' | 'apple' | 'phone';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -29,32 +31,31 @@ export default function SignInScreen() {
   const [passwordError, setPasswordError] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const { signIn, isPhoneVerified, isAuthenticated, hasSeenWelcome } = useAppSession();
+  const { signIn, isPhoneVerified, isAuthenticated, hasSeenWelcome } =
+    useAppSession();
+
+
+  const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
 
   useEffect(() => {
-     if (!isAuthenticated) {
+    if (!isAuthenticated) {
       return;
     }
 
     setIsSigningIn(false);
 
     if (!isPhoneVerified) {
-      router.replace(
-        '/(auth)/OtpVerificationScreen',
-      );
+      router.replace('/(auth)/OtpVerificationScreen');
 
       return;
     }
 
     if (!isPhoneVerified) {
-      router.replace(
-        '/(auth)/OtpVerificationScreen',
-      );
+      router.replace('/(auth)/OtpVerificationScreen');
 
       return;
     }
-      router.replace('/(tabs)/home');
-
+    router.replace('/(tabs)/home');
   }, [isAuthenticated, hasSeenWelcome, isPhoneVerified]);
 
   const handleSignIn = async () => {
@@ -88,39 +89,51 @@ export default function SignInScreen() {
     }
 
     try {
-    setIsSigningIn(true);
+      setIsSigningIn(true);
 
-    await signIn(
-      normalizedEmail,
-      password,
-    );
+      await signIn(normalizedEmail, password);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to sign in.';
 
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Unable to sign in.';
-
-    setPasswordError(message);
-    setIsSigningIn(false);
-  }
+      setPasswordError(message);
+      setIsSigningIn(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
-    console.log('Continue with Google');
+    try {
+      setBusyProvider('google');
+
+      // Later:
+      // await signInWithGoogle();
+    } catch (error) {
+      console.error('Google sign in failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
   const handleAppleSignIn = () => {
-    console.log('Continue with Apple');
+    try {
+      setBusyProvider('apple');
+
+      // Later:
+      // await signInWithApple();
+    } catch (error) {
+      console.error('Apple sign in failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
   const handlePhoneSignIn = () => {
     router.push({
-    pathname: '/(auth)/PhoneAuthScreen',
-    params: {
-      mode: 'sign-in',
-    },
-  });
+      pathname: '/(auth)/PhoneAuthScreen',
+      params: {
+        mode: 'sign-in',
+      },
+    });
   };
 
   const formIsIncomplete = !email.trim() || !password;
@@ -205,10 +218,11 @@ export default function SignInScreen() {
               <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </Pressable>
 
-            <SocialSignIn
+            <AlternativeSignIn
               onGooglePress={handleGoogleSignIn}
               onApplePress={handleAppleSignIn}
               onPhonePress={handlePhoneSignIn}
+              busyProvider={busyProvider}
             />
           </View>
 
