@@ -16,7 +16,7 @@ import StockWave from '../../assets/icons/StockWave';
 import AuthHeader from '../../components/common/AuthHeader';
 import { TextField } from '../../components/form/TextField';
 import { Button } from '../../components/ui/Button';
-import { AlternativeSignIn } from '../../components/ui/AlternativeSignin';
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignIn';
 
 import { useAppSession } from '../../context/AppSessionContext';
 

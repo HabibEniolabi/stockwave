@@ -18,7 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import { AlternativeSignIn } from '../../components/ui/AlternativeSignin';
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignIn';
 import { useAppSession } from '../../context/AppSessionContext';
 
   type Provider = 'google' | 'apple' | 'phone';
