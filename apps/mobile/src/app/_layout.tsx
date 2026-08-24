@@ -11,8 +11,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { useFonts } from 'expo-font';
 
-import { AppSessionProvider } from '../../context/AppSessionContext';
-import { registerSupabaseAuthLifecycle } from '../../lib/supabase';
+import { AppSessionProvider } from '../context/AppSessionContext';
+import { registerSupabaseAuthLifecycle } from '../lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 

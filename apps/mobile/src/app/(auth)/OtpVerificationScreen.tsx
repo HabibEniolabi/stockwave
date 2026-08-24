@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,69 +10,130 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthHeader from '../../components/common/AuthHeader';
+
 import { OtpInput, type OtpStatus } from '../../components/form/OtpInput';
-import { OtpPreviewModal } from '../../components/ui/OtpPreviewModal';
+
 import { BackButton } from '../../components/ui/BackButton';
 import { Button } from '../../components/ui/Button';
+
+import { useAppSession } from '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import { useAppSession } from '../../context/AppSessionContext';
 
 const OTP_LENGTH = 6;
-const OTP_PREVIEW_DURATION = 6000;
+const SUCCESS_DELAY = 900;
+const RESEND_COOLDOWN = 60;
 
 export default function OtpVerificationScreen() {
   const [verificationCode, setVerificationCode] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
   const [error, setError] = useState('');
-  const [otpModalVisible, setOtpModalVisible] = useState(false);
 
   const [otpStatus, setOtpStatus] = useState<OtpStatus>('default');
+
   const [shakeTrigger, setShakeTrigger] = useState(0);
+
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
-  const VERIFY_DELAY = 700;
-  const SUCCESS_DELAY = 900;
+  /*
+   * Because the initial OTP was just sent from
+   * PhoneNumberScreen, don't immediately allow
+   * another request.
+   */
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN);
 
-  const { completePhoneVerification } = useAppSession();
+  const { pendingPhone, verifyPhoneCode, resendPhoneCode } = useAppSession();
 
+  /*
+   * Resend countdown.
+   */
   useEffect(() => {
-    // Opening the modal generates a new random OTP.
-    setOtpModalVisible(true);
-  }, []);
+    if (resendCooldown <= 0) {
+      return;
+    }
 
-  const verifyCode = (code: string) => {
+    const timer = setInterval(() => {
+      setResendCooldown((current) => {
+        if (current <= 1) {
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [resendCooldown]);
+
+  /*
+   * Verify OTP with Supabase.
+   *
+   * No local/generated OTP comparison anymore.
+   */
+  const verifyCode = async (code: string) => {
     if (isVerifying || code.length !== OTP_LENGTH) {
       return;
     }
 
-    setError('');
-    setIsVerifying(true);
-    setOtpStatus('default');
+    if (!pendingPhone) {
+      setOtpStatus('error');
+      setShakeTrigger((current) => current + 1);
 
-    setTimeout(() => {
-      if (code !== generatedOtp) {
-        setOtpStatus('error');
-        setShakeTrigger((current) => current + 1);
-        setError('The verification code is incorrect.');
-        setIsVerifying(false);
-        return;
-      }
+      setError('Unable to find the phone number being verified.');
+
+      return;
+    }
+
+    try {
+      setError('');
+      setOtpStatus('default');
+      setIsVerifying(true);
+
+      /*
+       * AppSessionContext
+       *      ↓
+       * verifyPhoneChange()
+       *      ↓
+       * supabase.auth.verifyOtp({
+       *   phone,
+       *   token: code,
+       *   type: 'phone_change'
+       * })
+       */
+      await verifyPhoneCode(code);
 
       setOtpStatus('success');
       setShakeTrigger((current) => current + 1);
 
-      // THIS WAS MISSING
-      completePhoneVerification();
-
+      /*
+       * Leave the green success state visible
+       * briefly before navigation.
+       */
       setTimeout(() => {
         router.replace('/(auth)/WelcomeScreen');
       }, SUCCESS_DELAY);
-    }, VERIFY_DELAY);
+    } catch (error) {
+      console.error('PHONE OTP VERIFICATION ERROR', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'The verification code is incorrect.';
+
+      setOtpStatus('error');
+      setShakeTrigger((current) => current + 1);
+      setError(message);
+
+      setIsVerifying(false);
+    }
   };
 
   const handleCodeChange = (value: string) => {
@@ -85,9 +147,12 @@ export default function OtpVerificationScreen() {
       setError('');
     }
 
-    // Automatically verify immediately after the sixth digit.
+    /*
+     * Automatically verify when the sixth
+     * digit has been entered.
+     */
     if (value.length === OTP_LENGTH) {
-      verifyCode(value);
+      void verifyCode(value);
     }
   };
 
@@ -101,23 +166,73 @@ export default function OtpVerificationScreen() {
     if (verificationCode.length !== OTP_LENGTH) {
       setOtpStatus('error');
       setShakeTrigger((current) => current + 1);
+
       setError(`Enter the ${OTP_LENGTH}-digit verification code.`);
+
       return;
     }
 
-    verifyCode(verificationCode);
+    void verifyCode(verificationCode);
   };
 
-  const handleResendCode = () => {
-    setVerificationCode('');
-    setGeneratedOtp('');
-    setError('');
+  /*
+   * This is where resend belongs.
+   */
+  const handleResendCode = async () => {
+    if (isResending || resendCooldown > 0) {
+      return;
+    }
 
-    setOtpStatus('default');
-    setOtpModalVisible(true);
+    if (!pendingPhone) {
+      setError('Unable to find the phone number being verified.');
+
+      return;
+    }
+
+    try {
+      setIsResending(true);
+
+      /*
+       * Clear the previous OTP entry/state.
+       */
+      setVerificationCode('');
+      setError('');
+      setOtpStatus('default');
+
+      /*
+       * AppSessionContext
+       *      ↓
+       * resendPhoneVerification()
+       *      ↓
+       * supabase.auth.resend({
+       *   type: 'phone_change',
+       *   phone
+       * })
+       */
+      await resendPhoneCode();
+
+      /*
+       * Start another cooldown only after
+       * Supabase successfully accepts the request.
+       */
+      setResendCooldown(RESEND_COOLDOWN);
+    } catch (error) {
+      console.error('RESEND PHONE OTP ERROR', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to resend the verification code.';
+
+      setError(message);
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const codeIsIncomplete = verificationCode.length !== OTP_LENGTH;
+
+  const resendDisabled = isResending || resendCooldown > 0 || isVerifying;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -130,7 +245,11 @@ export default function OtpVerificationScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <BackButton onPress={() => router.back()} />
+          <BackButton
+            onPress={() => {
+              router.back();
+            }}
+          />
 
           <View style={styles.mainContent}>
             <AuthHeader
@@ -162,9 +281,23 @@ export default function OtpVerificationScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Resend verification code"
                   hitSlop={8}
-                  onPress={handleResendCode}
+                  disabled={resendDisabled}
+                  onPress={() => {
+                    void handleResendCode();
+                  }}
                 >
-                  <Text style={styles.resendText}>Resend code</Text>
+                  <Text
+                    style={[
+                      styles.resendText,
+                      resendDisabled && styles.resendTextDisabled,
+                    ]}
+                  >
+                    {isResending
+                      ? 'Resending...'
+                      : resendCooldown > 0
+                        ? `Resend in ${resendCooldown}s`
+                        : 'Resend code'}
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -175,24 +308,12 @@ export default function OtpVerificationScreen() {
               title={isVerifying ? 'Verifying...' : 'Verify Account'}
               variant="primary"
               loading={isVerifying}
-              disabled={codeIsIncomplete}
+              disabled={codeIsIncomplete || isVerifying}
               onPress={handleVerifyCode}
             />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <OtpPreviewModal
-        visible={otpModalVisible}
-        length={OTP_LENGTH}
-        duration={OTP_PREVIEW_DURATION}
-        onCodeGenerated={(code) => {
-          setGeneratedOtp(code);
-        }}
-        onClose={() => {
-          setOtpModalVisible(false);
-        }}
-      />
     </SafeAreaView>
   );
 }
@@ -245,6 +366,10 @@ const styles = StyleSheet.create({
   resendText: {
     ...getTypography('bodyMedium', 'semiBold'),
     color: colors.primary[100],
+  },
+
+  resendTextDisabled: {
+    color: colors.neutral[400],
   },
 
   footer: {
