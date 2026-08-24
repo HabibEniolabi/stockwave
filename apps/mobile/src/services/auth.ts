@@ -1,9 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 export type SignUpPayload = {
-  firstName: string;
-  lastName: string;
-  phone: string;
+  username: string;
   email: string;
   password: string;
 };
@@ -22,31 +20,19 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function signUpWithEmail({
-  firstName,
-  lastName,
+  username,
   email,
   password,
-  phone,
 }: SignUpPayload) {
   const normalizedEmail = email.trim().toLowerCase();
-
-  const normalizedPhone = phone.trim();
+  const normalizedUsername = username.trim();
 
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
     options: {
       data: {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-
-        /*
-         * Keep this until phone verification
-         * completes so the OTP flow can survive
-         * navigation/session restoration.
-         */
-        registration_phone: normalizedPhone,
-
+        username: normalizedUsername,
         has_seen_welcome: false,
       },
     },
@@ -69,28 +55,39 @@ export async function signUpWithEmail({
     );
   }
 
-  /*
-   * Attach the phone number to the authenticated
-   * Supabase user.
-   *
-   * With phone confirmation enabled, Supabase
-   * sends an OTP to this number.
-   */
-  const { error: phoneUpdateError } = await supabase.auth.updateUser({
-    phone: normalizedPhone,
-  });
+  return data;
+}
 
-  if (phoneUpdateError) {
-    throw phoneUpdateError;
+export async function requestPhoneVerification(
+  phone: string,
+) {
+  const normalizedPhone = phone.trim();
+
+  const { data, error } =
+    await supabase.auth.updateUser({
+      phone: normalizedPhone,
+
+      data: {
+        /*
+         * Temporarily save this so the OTP
+         * flow can recover it if necessary.
+         */
+        registration_phone: normalizedPhone,
+      },
+    });
+
+  if (error) {
+    throw error;
   }
 
   return data;
 }
 
+
 export async function verifyPhoneChange(phone: string, token: string) {
   const { data, error } = await supabase.auth.verifyOtp({
-    phone,
-    token,
+    phone: phone.trim(),
+    token: token.trim(),
     type: 'phone_change',
   });
 
