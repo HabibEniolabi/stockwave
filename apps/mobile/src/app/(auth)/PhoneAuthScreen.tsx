@@ -178,7 +178,7 @@ export default function PhoneAuthScreen() {
                 }}
               />
             </View>
-
+            <View style={styles.footer}>
             <Button
               title="Continue"
               variant="primary"
@@ -186,6 +186,7 @@ export default function PhoneAuthScreen() {
               disabled={formIsIncomplete}
               onPress={handleContinue}
             />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -218,4 +219,9 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing[4],
   },
+
+  footer: {
+    marginTop: 'auto',
+    paddingBottom: spacing[8],
+  }
 });

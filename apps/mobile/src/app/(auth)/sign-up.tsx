@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
 
   mainContent: {
-    gap: spacing[10],
+    gap: spacing[5],
     marginTop: spacing[12],
   },
 
@@ -328,7 +328,6 @@ const styles = StyleSheet.create({
   formError: {
     ...getTypography('bodySmall'),
     color: colors.error.base,
-    textAlign: 'center',
   },
 
   footer: {

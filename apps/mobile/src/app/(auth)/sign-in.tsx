@@ -273,7 +273,6 @@ const styles = StyleSheet.create({
 
   forgotPasswordButton: {
     alignSelf: 'flex-end',
-    marginTop: spacing[2],
   },
 
   forgotPasswordText: {
