@@ -7,40 +7,57 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
-import { spacing } from '../../theme/spacing';
-import { colors } from '../../theme/colors';
-import AuthHeader from '../../components/common/AuthHeader';
-import StockWave from '../../assets/icons/StockWave';
-import { TextField } from '../../components/form/TextField';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import StockWave from '../../assets/icons/StockWave';
+
+import AuthHeader from '../../components/common/AuthHeader';
+import { TextField } from '../../components/form/TextField';
 import { Button } from '../../components/ui/Button';
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignIn';
+
+import { useAppSession } from '../../context/AppSessionContext';
+
+import { spacing } from '../../theme/spacing';
+import { colors } from '../../theme/colors';
 import { getTypography } from '../../theme/typography';
-import { SocialSignIn } from '../../components/ui/SocianSignin';
+
+type Provider = 'google' | 'apple' | 'phone';
 
 export default function SignUpScreen() {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const [username, setUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
-
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [isSigningUp, setIsSigningUp] = useState(false)
+  const [formError, setFormError] = useState('');
 
-  const handleContinue = () => {
-    if(isSigningUp){
+  const [isSigningUp, setIsSigningUp] = useState(false);
+
+  const { signUp } = useAppSession();
+
+  const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
+
+  const handleContinue = async () => {
+    if (isSigningUp) {
       return;
     }
+
     const normalizedUsername = username.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
     setUsernameError('');
     setEmailError('');
     setPasswordError('');
+    setFormError('');
 
+    /*
+     * Username validation
+     */
     if (!normalizedUsername) {
       setUsernameError('Username is required.');
       return;
@@ -58,6 +75,9 @@ export default function SignUpScreen() {
       return;
     }
 
+    /*
+     * Email validation
+     */
     if (!normalizedEmail) {
       setEmailError('Email address is required.');
       return;
@@ -68,6 +88,9 @@ export default function SignUpScreen() {
       return;
     }
 
+    /*
+     * Password validation
+     */
     if (!password) {
       setPasswordError('Password is required.');
       return;
@@ -78,26 +101,67 @@ export default function SignUpScreen() {
       return;
     }
 
-    setIsSigningUp(true);
+    try {
+      setIsSigningUp(true);
 
-    console.log({
-      username: normalizedUsername,
-      email: normalizedEmail,
-      password,
-    });
+      await signUp({
+        username: normalizedUsername,
+        email: normalizedEmail,
+        password,
+      });
 
-    router.push('/(auth)/PhoneNumberScreen');
+      router.replace('/(auth)/PhoneNumberScreen');
+    } catch (error) {
+      console.error('SIGN UP ERROR', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to create your account. Please try again.';
+
+      setFormError(message);
+    } finally {
+      setIsSigningUp(false);
+    }
   };
 
   const handleGoogleSignUp = () => {
-    console.log('Continue with Google');
+    try {
+      setBusyProvider('google');
+
+      // Later:
+      // await signInWithGoogle();
+    } catch (error) {
+      console.error('Google sign up failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
   const handleAppleSignUp = () => {
-    console.log('Continue with Apple');
+    try {
+      setBusyProvider('apple');
+
+      // Later:
+      // await signInWithApple();
+    } catch (error) {
+      console.error('Apple sign up failed:', error);
+    } finally {
+      setBusyProvider(null);
+    }
   };
 
-  const formIsComplete = !email.trim() || !password || !username.trim();
+  const handlePhoneSignUp = () => {
+    router.push({
+      pathname: '/(auth)/PhoneAuthScreen',
+      params: {
+        mode: 'sign-up',
+      },
+    });
+  };
+
+  const formIsIncomplete = !username.trim() || !email.trim() || !password;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -134,8 +198,13 @@ export default function SignUpScreen() {
                   if (usernameError) {
                     setUsernameError('');
                   }
+
+                  if (formError) {
+                    setFormError('');
+                  }
                 }}
               />
+
               <TextField
                 placeholder="Email"
                 value={email}
@@ -152,8 +221,13 @@ export default function SignUpScreen() {
                   if (emailError) {
                     setEmailError('');
                   }
+
+                  if (formError) {
+                    setFormError('');
+                  }
                 }}
               />
+
               <TextField
                 placeholder="Password"
                 value={password}
@@ -161,8 +235,6 @@ export default function SignUpScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                // autoComplete="new-password"
-                // textContentType="newPassword"
                 onSubmitEditing={handleContinue}
                 {...Platform.select({
                   ios: {
@@ -180,29 +252,43 @@ export default function SignUpScreen() {
                   if (passwordError) {
                     setPasswordError('');
                   }
+
+                  if (formError) {
+                    setFormError('');
+                  }
                 }}
               />
             </View>
+
+            {formError ? (
+              <Text style={styles.formError}>{formError}</Text>
+            ) : null}
+
             <Button
               title="Continue"
-              onPress={handleContinue}
-              loading={isSigningUp}
-              disabled={formIsComplete}
               variant="primary"
+              loading={isSigningUp}
+              disabled={formIsIncomplete || isSigningUp}
+              onPress={handleContinue}
             />
 
-            <SocialSignIn
+            <AlternativeSignIn
               onGooglePress={handleGoogleSignUp}
               onApplePress={handleAppleSignUp}
+              onPhonePress={handlePhoneSignUp}
+              busyProvider={busyProvider}
             />
           </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account?</Text>
+
             <Pressable
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => router.push('/(auth)/sign-in')}
+              onPress={() => {
+                router.replace('/(auth)/sign-in');
+              }}
             >
               <Text style={styles.footerLink}>Sign in</Text>
             </Pressable>
@@ -231,7 +317,7 @@ const styles = StyleSheet.create({
   },
 
   mainContent: {
-    gap: spacing[10],
+    gap: spacing[5],
     marginTop: spacing[12],
   },
 
@@ -239,25 +325,9 @@ const styles = StyleSheet.create({
     gap: spacing[4],
   },
 
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.neutral[100],
-  },
-
-  dividerText: {
-    ...getTypography('bodyLarge'),
-    color: colors.neutral[400],
-  },
-
-  socialButtons: {
-    gap: spacing[3],
+  formError: {
+    ...getTypography('bodySmall'),
+    color: colors.error.base,
   },
 
   footer: {

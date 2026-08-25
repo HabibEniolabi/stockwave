@@ -23,6 +23,7 @@ import { BackButton } from '../../components/ui/BackButton';
 import { Button } from '../../components/ui/Button';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { useAppSession } from '../../context/AppSessionContext';
 
 export default function PhoneNumberScreen() {
   const [country, setCountry] = useState<Country>(
@@ -32,89 +33,115 @@ export default function PhoneNumberScreen() {
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleContinue = () => {
-    setPhoneError('');
+  const { startPhoneVerification } = useAppSession();
 
-    const normalizedNumber = phoneNumber.trim();
+const handleContinue = async () => {
+  if (isSubmitting) {
+    return;
+  }
 
-    if (!normalizedNumber) {
-      setPhoneError('Phone number is required.');
-      return;
-    }
+  setPhoneError('');
 
-    const lengthError = validatePhoneNumberLength(
-      normalizedNumber,
-      country.iso2,
+  const normalizedNumber = phoneNumber.trim();
+
+  if (!normalizedNumber) {
+    setPhoneError('Phone number is required.');
+    return;
+  }
+
+  const lengthError = validatePhoneNumberLength(
+    normalizedNumber,
+    country.iso2,
+  );
+
+  if (lengthError === 'TOO_SHORT') {
+    setPhoneError('This phone number is too short.');
+    return;
+  }
+
+  if (lengthError === 'TOO_LONG') {
+    setPhoneError('This phone number is too long.');
+    return;
+  }
+
+  if (lengthError === 'INVALID_LENGTH') {
+    setPhoneError(
+      `Enter a valid phone number for ${country.name}.`,
+    );
+    return;
+  }
+
+  if (
+    lengthError === 'NOT_A_NUMBER' ||
+    lengthError === 'INVALID_COUNTRY'
+  ) {
+    setPhoneError('Enter a valid phone number.');
+    return;
+  }
+
+  const parsedPhoneNumber = parsePhoneNumberFromString(
+    normalizedNumber,
+    country.iso2,
+  );
+
+  if (!parsedPhoneNumber || !parsedPhoneNumber.isValid()) {
+    setPhoneError(
+      `Enter a valid phone number for ${country.name}.`,
+    );
+    return;
+  }
+
+  if (
+    parsedPhoneNumber.country &&
+    parsedPhoneNumber.country !== country.iso2
+  ) {
+    setPhoneError(
+      `This number does not match ${country.name}.`,
+    );
+    return;
+  }
+  
+  const internationalPhoneNumber =
+    parsedPhoneNumber.number;
+
+  console.log({
+    country: country.name,
+    countryCode: country.iso2,
+    nationalNumber:
+      parsedPhoneNumber.formatNational(),
+    internationalNumber:
+      parsedPhoneNumber.formatInternational(),
+    e164: internationalPhoneNumber,
+  });
+
+  try {
+    setIsSubmitting(true);
+
+    await startPhoneVerification(
+      internationalPhoneNumber,
     );
 
-    if (lengthError === 'TOO_SHORT') {
-      setPhoneError('This phone number is too short.');
-      return;
-    }
-
-    if (lengthError === 'TOO_LONG') {
-      setPhoneError('This phone number is too long.');
-      return;
-    }
-
-    if (lengthError === 'INVALID_LENGTH') {
-      setPhoneError(
-        `Enter a valid phone number for ${country.name}.`,
-      );
-      return;
-    }
-
-    if (
-      lengthError === 'NOT_A_NUMBER' ||
-      lengthError === 'INVALID_COUNTRY'
-    ) {
-      setPhoneError('Enter a valid phone number.');
-      return;
-    }
-
-    const parsedPhoneNumber = parsePhoneNumberFromString(
-      normalizedNumber,
-      country.iso2,
+    router.push(
+      '/(auth)/OtpVerificationScreen',
+    );
+  } catch (error) {
+    console.error(
+      'PHONE VERIFICATION ERROR',
+      error,
     );
 
-    if (!parsedPhoneNumber || !parsedPhoneNumber.isValid()) {
-      setPhoneError(
-        `Enter a valid phone number for ${country.name}.`,
-      );
-      return;
-    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unable to send the verification code. Please try again.';
 
-    if (
-      parsedPhoneNumber.country &&
-      parsedPhoneNumber.country !== country.iso2
-    ) {
-      setPhoneError(
-        `This number does not match ${country.name}.`,
-      );
-      return;
-    }
-
-    const internationalPhoneNumber =
-      parsedPhoneNumber.number;
-
-    console.log({
-      country: country.name,
-      countryCode: country.iso2,
-      nationalNumber:
-        parsedPhoneNumber.formatNational(),
-      internationalNumber:
-        parsedPhoneNumber.formatInternational(),
-      e164: internationalPhoneNumber,
-    });
-
-    router.push({
-      pathname: '/(auth)/OtpVerificationScreen',
-      params: {
-        phoneNumber: internationalPhoneNumber,
-      },
-    });
-  };
+    setPhoneError(message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -162,7 +189,8 @@ export default function PhoneNumberScreen() {
         <Button
           title="Send code"
           variant="primary"
-          disabled={!phoneNumber.trim()}
+          loading={isSubmitting}
+          disabled={!phoneNumber.trim() || isSubmitting}
           onPress={handleContinue}
         />
       </View>

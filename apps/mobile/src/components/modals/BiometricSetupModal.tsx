@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,12 +29,12 @@ type BiometricMode =
 
 type BiometricSetupModalProps = {
   visible: boolean;
-  onClose: () => void;
+  onContinueToPin: () => void;
 };
 
 export function BiometricSetupModal({
   visible,
-  onClose,
+  onContinueToPin,
 }: BiometricSetupModalProps) {
   const {
     enableBiometrics,
@@ -126,11 +125,7 @@ export function BiometricSetupModal({
   }, [visible]);
 
   const handleUsePinInstead = () => {
-    onClose();
-
-    router.replace(
-      '/CreatePinScreen',
-    );
+    onContinueToPin();
   };
 
   const handleEnableBiometrics =
@@ -178,21 +173,8 @@ export function BiometricSetupModal({
           return;
         }
 
-        /**
-         * User successfully authenticated
-         * using the device biometric.
-         */
         enableBiometrics();
-
-        onClose();
-
-        /**
-         * PIN is still mandatory as the
-         * fallback security method.
-         */
-        router.replace(
-          '/CreatePinScreen',
-        );
+        onContinueToPin();
       } catch {
         setError(
           'Unable to complete biometric authentication.',

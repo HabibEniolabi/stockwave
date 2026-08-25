@@ -1,85 +1,85 @@
-import { router, Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
-} from 'react-native';
+
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthHeader from '../../components/common/AuthHeader';
+
 import { TextField } from '../../components/form/TextField';
+
 import { BackButton } from '../../components/ui/BackButton';
+
 import { Button } from '../../components/ui/Button';
+
 import { useAppSession } from '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 export default function CreateNewPasswordScreen() {
-  const {
-    resetPasswordVerified,
-    completePasswordReset,
-  } = useAppSession();
+  const { resetPasswordVerified, completePasswordReset } = useAppSession();
 
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] =
-    useState('');
 
-  const [passwordError, setPasswordError] =
-    useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [confirmError, setConfirmError] =
-    useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const [confirmError, setConfirmError] = useState('');
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!resetPasswordVerified) {
-    return (
-      <Redirect href="/(auth)/forgot-password" />
-    );
+    return <Redirect href="/(auth)/forgot-password" />;
   }
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     setPasswordError('');
     setConfirmError('');
 
     if (password.length < 8) {
-      setPasswordError(
-        'Password must be at least 8 characters.',
-      );
+      setPasswordError('Password must be at least 8 characters.');
+
       return;
     }
 
     if (password !== confirmPassword) {
       setConfirmError('Passwords do not match.');
+
       return;
     }
 
-    // Later:
-    // await api.resetPassword({
-    //   email: resetPasswordEmail,
-    //   code: resetPasswordCode,
-    //   password,
-    // });
+    try {
+      setIsSubmitting(true);
 
-    completePasswordReset();
+      await completePasswordReset(password);
 
-    router.replace(
-      '/(auth)/PasswordResetSuccessScreen',
-    );
+      router.replace('/(auth)/PasswordResetSuccessScreen');
+    } catch (error) {
+      setPasswordError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to update your password.',
+      );
+
+      setIsSubmitting(false);
+    }
   };
 
-  const formIncomplete =
-    !password || !confirmPassword;
+  const formIncomplete = !password || !confirmPassword;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : undefined
-        }
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <BackButton onPress={() => router.back()} />
 
@@ -97,9 +97,15 @@ export default function CreateNewPasswordScreen() {
               error={passwordError}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="next"
               onChangeText={(value) => {
                 setPassword(value);
-                setPasswordError('');
+
+                if (passwordError) {
+                  setPasswordError('');
+                }
               }}
             />
 
@@ -110,9 +116,18 @@ export default function CreateNewPasswordScreen() {
               error={confirmError}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                void handleResetPassword();
+              }}
               onChangeText={(value) => {
                 setConfirmPassword(value);
-                setConfirmError('');
+
+                if (confirmError) {
+                  setConfirmError('');
+                }
               }}
             />
           </View>
@@ -121,8 +136,11 @@ export default function CreateNewPasswordScreen() {
         <Button
           title="Reset password"
           variant="primary"
+          loading={isSubmitting}
           disabled={formIncomplete}
-          onPress={handleResetPassword}
+          onPress={() => {
+            void handleResetPassword();
+          }}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

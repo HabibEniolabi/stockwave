@@ -1,10 +1,6 @@
-import { useCallback, useState } from 'react';
-
-import { useFocusEffect } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
+
 import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
@@ -17,45 +13,10 @@ export default function HomeScreen() {
     isAuthenticated,
     isPhoneVerified,
     hasSeenWelcome,
-
-    //Test
-    lockApp,
-
     biometricEnabled,
-
     pinCreated,
+    lockApp,
   } = useAppSession();
-  const isFocused = useIsFocused();
-
-  const [biometricModalVisible, setBiometricModalVisible] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      const shouldShowSecuritySetup =
-        isAuthenticated && hasSeenWelcome && !pinCreated;
-
-      if (!shouldShowSecuritySetup) {
-        setBiometricModalVisible(false);
-        return;
-      }
-
-      const timer = setTimeout(() => {
-        setBiometricModalVisible(true);
-      }, 1000);
-
-      return () => {
-        clearTimeout(timer);
-
-        /*
-         * Home lost focus.
-         *
-         * Make sure its modal cannot remain
-         * visible over Portfolio/Swap/etc.
-         */
-        setBiometricModalVisible(false);
-      };
-    }, [isAuthenticated, hasSeenWelcome, pinCreated]),
-  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -64,9 +25,8 @@ export default function HomeScreen() {
 
         <Text style={styles.subtitle}>Your Home UI goes here.</Text>
 
-        {/* DEVELOPMENT ONLY */}
         <View style={styles.debugContainer}>
-          <Text style={styles.debugTitle}>Dummy session</Text>
+          <Text style={styles.debugTitle}>Session</Text>
 
           <Text style={styles.debugText}>
             Authenticated: {isAuthenticated ? 'Yes' : 'No'}
@@ -91,15 +51,6 @@ export default function HomeScreen() {
 
         <Button title="DEV: Lock App" variant="outline" onPress={lockApp} />
       </View>
-
-      {isFocused ? (
-        <BiometricSetupModal
-          visible={biometricModalVisible}
-          onClose={() => {
-            setBiometricModalVisible(false);
-          }}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }

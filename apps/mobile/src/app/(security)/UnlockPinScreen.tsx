@@ -1,26 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import * as LocalAuthentication from 'expo-local-authentication';
+
 import { OtpInput } from '../../components/form/OtpInput';
+
 import { AppIcon } from '../../components/icons/AppIcon';
+
 import BackspaceIcon from '../../assets/icons/BackspaceIcon';
+
 import { useAppSession } from '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+
 import { getTypography } from '../../theme/typography';
 
 const PIN_LENGTH = 6;
-
-/*
- * Dummy for now.
- * Later:
- *
- * user.firstName
- */
-const DISPLAY_NAME = 'Agatha';
 
 type BiometricMode = 'face' | 'fingerprint' | 'unsupported';
 
@@ -31,68 +33,42 @@ type KeypadKey = {
 
 const keypadRows: KeypadKey[][] = [
   [
-    {
-      digit: '1',
-    },
-    {
-      digit: '2',
-      letters: 'ABC',
-    },
-    {
-      digit: '3',
-      letters: 'DEF',
-    },
+    { digit: '1' },
+    { digit: '2', letters: 'ABC' },
+    { digit: '3', letters: 'DEF' },
   ],
   [
-    {
-      digit: '4',
-      letters: 'GHI',
-    },
-    {
-      digit: '5',
-      letters: 'JKL',
-    },
-    {
-      digit: '6',
-      letters: 'MNO',
-    },
+    { digit: '4', letters: 'GHI' },
+    { digit: '5', letters: 'JKL' },
+    { digit: '6', letters: 'MNO' },
   ],
   [
-    {
-      digit: '7',
-      letters: 'PQRS',
-    },
-    {
-      digit: '8',
-      letters: 'TUV',
-    },
-    {
-      digit: '9',
-      letters: 'WXYZ',
-    },
+    { digit: '7', letters: 'PQRS' },
+    { digit: '8', letters: 'TUV' },
+    { digit: '9', letters: 'WXYZ' },
   ],
 ];
 
 export default function UnlockPinScreen() {
+  const {
+    user,
+    biometricEnabled,
+    verifyPin,
+    unlockApp,
+    signOutCurrentDevice,
+  } = useAppSession();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [shakeTrigger, setShakeTrigger] = useState(0);
   const [isVerifying, setIsVerifying] = useState(false);
   const [biometricMode, setBiometricMode] =
     useState<BiometricMode>('unsupported');
-
-  /*
-   * Prevent Face ID from repeatedly
-   * launching because of rerenders.
-   */
   const hasAutoPrompted = useRef(false);
-  const { biometricEnabled, verifyPin, unlockApp, resetSession } =
-    useAppSession();
+  const displayName =
+    user?.user_metadata?.first_name || user?.user_metadata?.username || 'there';
 
-  /*
-   * Detect the biometric type being
-   * used on this device.
-   */
+  const initial = displayName.charAt(0).toUpperCase();
+
   useEffect(() => {
     if (!biometricEnabled) {
       return;
@@ -101,6 +77,7 @@ export default function UnlockPinScreen() {
     const detectBiometric = async () => {
       try {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
+
         const enrolled = await LocalAuthentication.isEnrolledAsync();
 
         if (!hasHardware || !enrolled) {
@@ -118,6 +95,7 @@ export default function UnlockPinScreen() {
           )
         ) {
           setBiometricMode('face');
+
           return;
         }
 
@@ -138,9 +116,6 @@ export default function UnlockPinScreen() {
     void detectBiometric();
   }, [biometricEnabled]);
 
-  /*
-   * Face ID / Fingerprint unlock.
-   */
   const handleBiometricUnlock = useCallback(async () => {
     if (!biometricEnabled || biometricMode === 'unsupported' || isVerifying) {
       return;
@@ -152,20 +127,10 @@ export default function UnlockPinScreen() {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Unlock StockWave',
         cancelLabel: 'Use PIN instead',
-
-        /*
-         * If biometrics fail,
-         * fallback should be our
-         * StockWave PIN screen.
-         */
         disableDeviceFallback: true,
       });
 
       if (!result.success) {
-        /*
-         * Cancel just means:
-         * stay on PIN screen.
-         */
         if (
           result.error !== 'user_cancel' &&
           result.error !== 'system_cancel'
@@ -184,11 +149,6 @@ export default function UnlockPinScreen() {
     }
   }, [biometricEnabled, biometricMode, isVerifying, unlockApp]);
 
-  /*
-   * Automatically request Face ID /
-   * fingerprint once when this screen
-   * opens.
-   */
   useEffect(() => {
     if (
       !biometricEnabled ||
@@ -220,7 +180,9 @@ export default function UnlockPinScreen() {
 
       if (!isCorrect) {
         setError('Incorrect PIN. Please try again.');
+
         setShakeTrigger((current) => current + 1);
+
         setPin('');
 
         return;
@@ -251,10 +213,6 @@ export default function UnlockPinScreen() {
 
     setPin(nextPin);
 
-    /*
-     * Automatically verify once all
-     * 6 digits have been entered.
-     */
     if (nextPin.length === PIN_LENGTH) {
       setTimeout(() => {
         void verifyAndUnlock(nextPin);
@@ -262,31 +220,32 @@ export default function UnlockPinScreen() {
     }
   };
 
-  /*
-   * Functional bottom-right backspace.
-   */
   const handleBackspace = () => {
     if (isVerifying) {
       return;
     }
+
     setError('');
     setPin((current) => current.slice(0, -1));
   };
 
-  /*
-   * For now, forgotten PIN sends the
-   * user through full authentication.
-   *
-   * Backend integration will later
-   * replace this with the real reset flow.
-   */
-  const handleForgotPin = () => {
-    resetSession();
+  const handleForgotPin = async () => {
+    if (isVerifying) {
+      return;
+    }
 
-    router.replace('/(auth)/sign-in');
+    try {
+      setIsVerifying(true);
+      await signOutCurrentDevice();
+
+      router.replace('/(auth)/sign-in');
+    } catch {
+      setError('Unable to reset this device session. Please try again.');
+
+      setIsVerifying(false);
+    }
   };
 
-  const initial = DISPLAY_NAME.charAt(0).toUpperCase();
   const canUseBiometrics = biometricEnabled && biometricMode !== 'unsupported';
 
   return (
@@ -301,7 +260,7 @@ export default function UnlockPinScreen() {
 
           <Text style={styles.title}>Enter passcode</Text>
 
-          <Text style={styles.description}>Welcome back, {DISPLAY_NAME}.</Text>
+          <Text style={styles.description}>Welcome back, {displayName}.</Text>
 
           <View style={styles.pinContainer}>
             <OtpInput
@@ -344,9 +303,7 @@ export default function UnlockPinScreen() {
             </View>
           ))}
 
-          {/* Bottom keypad row */}
           <View style={styles.keypadRow}>
-            {/* Face ID / Fingerprint */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
@@ -375,7 +332,6 @@ export default function UnlockPinScreen() {
               )}
             </Pressable>
 
-            {/* Zero */}
             <Pressable
               disabled={isVerifying}
               style={({ pressed }) => [
@@ -388,13 +344,13 @@ export default function UnlockPinScreen() {
               <Text style={styles.keyNumber}>0</Text>
             </Pressable>
 
-            {/* Backspace */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Delete last digit"
               disabled={!pin.length || isVerifying}
               style={[
                 styles.specialKey,
+
                 !pin.length && styles.specialKeyDisabled,
               ]}
               onPress={handleBackspace}
@@ -407,7 +363,13 @@ export default function UnlockPinScreen() {
         <View style={styles.footer}>
           <Text style={styles.forgotText}>Forgotten passcode? </Text>
 
-          <Pressable hitSlop={8} onPress={handleForgotPin}>
+          <Pressable
+            hitSlop={8}
+            disabled={isVerifying}
+            onPress={() => {
+              void handleForgotPin();
+            }}
+          >
             <Text style={styles.resetText}>Reset</Text>
           </Pressable>
         </View>
@@ -495,7 +457,6 @@ const styles = StyleSheet.create({
 
   keyButtonPressed: {
     opacity: 0.7,
-
     transform: [
       {
         scale: 0.97,
