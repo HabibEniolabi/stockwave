@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
 import { Button } from '../../components/ui/Button';
@@ -16,12 +16,6 @@ export default function HomeScreen() {
 
   const {
     isAuthenticated,
-
-    /*
-     * Keep the current Home UI wording
-     * unchanged while using the new
-     * verification state internally.
-     */
     hasCompletedVerification: isPhoneVerified,
 
     hasSeenWelcome,
@@ -30,21 +24,6 @@ export default function HomeScreen() {
     lockApp,
   } = useAppSession();
 
-  /*
-   * Home is only reachable after Welcome
-   * has been completed.
-   *
-   * Therefore:
-   *
-   * Welcome
-   * → "I'm ready to start!"
-   * → Home
-   * → no PIN yet
-   * → show biometric setup.
-   *
-   * Once the PIN exists this will never
-   * appear again during normal Home loads.
-   */
   useEffect(() => {
     if (!pinCreated) {
       setIsSecuritySetupVisible(true);
@@ -58,7 +37,9 @@ export default function HomeScreen() {
   const handleContinueToPin = () => {
     setIsSecuritySetupVisible(false);
 
-    router.replace('/(security)/CreatePinScreen');
+    InteractionManager.runAfterInteractions(() => {
+      router.replace('/(security)/CreatePinScreen');
+    });
   };
 
   return (

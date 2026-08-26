@@ -57,7 +57,6 @@ const Layout = () => {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(security)" />
-        <Stack.Screen name="(profile)" />
       </Stack>
     </AppSessionProvider>
   );
