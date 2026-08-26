@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   KeyboardAvoidingView,
@@ -17,6 +18,8 @@ import AuthHeader from '../../components/common/AuthHeader';
 
 import { OtpInput, type OtpStatus } from '../../components/form/OtpInput';
 
+import { OtpPreviewModal } from '../../components/ui/OtpPreviewModal';
+
 import { BackButton } from '../../components/ui/BackButton';
 import { Button } from '../../components/ui/Button';
 
@@ -32,35 +35,61 @@ const RESEND_COOLDOWN = 60;
 
 export default function OtpVerificationScreen() {
   const [verificationCode, setVerificationCode] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [isOtpPreviewVisible, setIsOtpPreviewVisible] = useState(false);
   const [error, setError] = useState('');
-
   const [otpStatus, setOtpStatus] = useState<OtpStatus>('default');
-
   const [shakeTrigger, setShakeTrigger] = useState(0);
-
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const hasRequestedInitialCode = useRef(false);
 
-  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN);
+  const { startVerification, verifyVerificationCode } = useAppSession();
 
-  const { pendingPhone, verifyPhoneCode, resendPhoneCode } = useAppSession();
+  const requestVerificationCode = useCallback(async () => {
+    const challenge = await startVerification();
 
-  /*
-   * Resend countdown.
-   */
+    setGeneratedOtp(challenge.code);
+
+    setIsOtpPreviewVisible(true);
+
+    setResendCooldown(RESEND_COOLDOWN);
+  }, [startVerification]);
+
+  useEffect(() => {
+    if (hasRequestedInitialCode.current) {
+      return;
+    }
+
+    hasRequestedInitialCode.current = true;
+
+    const requestInitialCode = async () => {
+      try {
+        setError('');
+
+        await requestVerificationCode();
+      } catch (error) {
+        console.error('GENERATE VERIFICATION CODE ERROR', error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to generate the verification code.',
+        );
+      }
+    };
+
+    void requestInitialCode();
+  }, [requestVerificationCode]);
+
   useEffect(() => {
     if (resendCooldown <= 0) {
       return;
     }
 
     const timer = setInterval(() => {
-      setResendCooldown((current) => {
-        if (current <= 1) {
-          return 0;
-        }
-
-        return current - 1;
-      });
+      setResendCooldown((current) => (current <= 1 ? 0 : current - 1));
     }, 1000);
 
     return () => {
@@ -68,18 +97,8 @@ export default function OtpVerificationScreen() {
     };
   }, [resendCooldown]);
 
- 
   const verifyCode = async (code: string) => {
     if (isVerifying || code.length !== OTP_LENGTH) {
-      return;
-    }
-
-    if (!pendingPhone) {
-      setOtpStatus('error');
-      setShakeTrigger((current) => current + 1);
-
-      setError('Unable to find the phone number being verified.');
-
       return;
     }
 
@@ -88,29 +107,27 @@ export default function OtpVerificationScreen() {
       setOtpStatus('default');
       setIsVerifying(true);
 
-      await verifyPhoneCode(code);
+      await verifyVerificationCode(code);
 
       setOtpStatus('success');
+
       setShakeTrigger((current) => current + 1);
 
-      /*
-       * Leave the green success state visible
-       * briefly before navigation.
-       */
       setTimeout(() => {
         router.replace('/(auth)/WelcomeScreen');
       }, SUCCESS_DELAY);
     } catch (error) {
-      console.error('PHONE OTP VERIFICATION ERROR', error);
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'The verification code is incorrect.';
+      console.error('OTP VERIFICATION ERROR', error);
 
       setOtpStatus('error');
+
       setShakeTrigger((current) => current + 1);
-      setError(message);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'The verification code is incorrect.',
+      );
 
       setIsVerifying(false);
     }
@@ -127,10 +144,6 @@ export default function OtpVerificationScreen() {
       setError('');
     }
 
-    /*
-     * Automatically verify when the sixth
-     * digit has been entered.
-     */
     if (value.length === OTP_LENGTH) {
       void verifyCode(value);
     }
@@ -145,6 +158,7 @@ export default function OtpVerificationScreen() {
 
     if (verificationCode.length !== OTP_LENGTH) {
       setOtpStatus('error');
+
       setShakeTrigger((current) => current + 1);
 
       setError(`Enter the ${OTP_LENGTH}-digit verification code.`);
@@ -155,44 +169,27 @@ export default function OtpVerificationScreen() {
     void verifyCode(verificationCode);
   };
 
-  
   const handleResendCode = async () => {
-    if (isResending || resendCooldown > 0) {
-      return;
-    }
-
-    if (!pendingPhone) {
-      setError('Unable to find the phone number being verified.');
-
+    if (isResending || resendCooldown > 0 || isVerifying) {
       return;
     }
 
     try {
       setIsResending(true);
 
-      /*
-       * Clear the previous OTP entry/state.
-       */
       setVerificationCode('');
       setError('');
       setOtpStatus('default');
 
-      await resendPhoneCode();
-
-      /*
-       * Start another cooldown only after
-       * Supabase successfully accepts the request.
-       */
-      setResendCooldown(RESEND_COOLDOWN);
+      await requestVerificationCode();
     } catch (error) {
-      console.error('RESEND PHONE OTP ERROR', error);
+      console.error('RESEND VERIFICATION CODE ERROR', error);
 
-      const message =
+      setError(
         error instanceof Error
           ? error.message
-          : 'Unable to resend the verification code.';
-
-      setError(message);
+          : 'Unable to resend the verification code.',
+      );
     } finally {
       setIsResending(false);
     }
@@ -203,86 +200,92 @@ export default function OtpVerificationScreen() {
   const resendDisabled = isResending || resendCooldown > 0 || isVerifying;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <BackButton
-            onPress={() => {
-              router.back();
-            }}
-          />
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <BackButton onPress={() => router.back()} />
 
-          <View style={styles.mainContent}>
-            <AuthHeader
-              title="Enter verification code"
-              description={
-                'We have sent the verification code to your\nmobile number'
-              }
-            />
-
-            <View style={styles.otpSection}>
-              <OtpInput
-                value={verificationCode}
-                onChangeText={handleCodeChange}
-                length={OTP_LENGTH}
-                status={otpStatus}
-                shakeTrigger={shakeTrigger}
-                disabled={isVerifying}
-                autoFocus
+            <View style={styles.mainContent}>
+              <AuthHeader
+                title="Enter verification code"
+                description={
+                  'We have sent the verification code to your\nmobile number'
+                }
               />
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <View style={styles.otpSection}>
+                <OtpInput
+                  value={verificationCode}
+                  onChangeText={handleCodeChange}
+                  length={OTP_LENGTH}
+                  status={otpStatus}
+                  shakeTrigger={shakeTrigger}
+                  disabled={isVerifying}
+                  autoFocus
+                />
 
-              <View style={styles.resendContainer}>
-                <Text style={styles.resendQuestion}>
-                  Didn&apos;t receive the code?
-                </Text>
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Resend verification code"
-                  hitSlop={8}
-                  disabled={resendDisabled}
-                  onPress={() => {
-                    void handleResendCode();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.resendText,
-                      resendDisabled && styles.resendTextDisabled,
-                    ]}
-                  >
-                    {isResending
-                      ? 'Resending...'
-                      : resendCooldown > 0
-                        ? `Resend in ${resendCooldown}s`
-                        : 'Resend code'}
+                <View style={styles.resendContainer}>
+                  <Text style={styles.resendQuestion}>
+                    Didn&apos;t receive the code?
                   </Text>
-                </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Resend verification code"
+                    hitSlop={8}
+                    disabled={resendDisabled}
+                    onPress={() => {
+                      void handleResendCode();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.resendText,
+                        resendDisabled && styles.resendTextDisabled,
+                      ]}
+                    >
+                      {isResending
+                        ? 'Resending...'
+                        : resendCooldown > 0
+                          ? `Resend in ${resendCooldown}s`
+                          : 'Resend code'}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.footer}>
-            <Button
-              title={isVerifying ? 'Verifying...' : 'Verify Account'}
-              variant="primary"
-              loading={isVerifying}
-              disabled={codeIsIncomplete || isVerifying}
-              onPress={handleVerifyCode}
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <View style={styles.footer}>
+              <Button
+                title={isVerifying ? 'Verifying...' : 'Verify Account'}
+                variant="primary"
+                loading={isVerifying}
+                disabled={codeIsIncomplete || isVerifying}
+                onPress={handleVerifyCode}
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+
+      <OtpPreviewModal
+        visible={isOtpPreviewVisible}
+        code={generatedOtp}
+        onClose={() => {
+          setIsOtpPreviewVisible(false);
+        }}
+      />
+    </>
   );
 }
 
