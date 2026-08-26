@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
 import { Button } from '../../components/ui/Button';
 import { useAppSession } from '../../context/AppSessionContext';
 import { colors } from '../../theme/colors';
@@ -14,37 +13,33 @@ import { StockWaveSuccessMark } from '../../components/branding/StockWaveSuccess
 import { SuccessInfo } from '../../components/common/SuccessInfo';
 
 export default function WelcomeScreen() {
-  const [showSecuritySetup, setShowSecuritySetup] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
 
-  const { user } = useAppSession();
+  const { completeWelcome, user } = useAppSession();
 
   const username = user?.user_metadata?.username ?? 'there';
 
-  const handleReadyToStart = () => {
-    /*
-     * Do NOT call completeWelcome here.
-     *
-     * The modal should appear immediately
-     * when the user taps the button.
-     */
-    setShowSecuritySetup(true);
+  const handleReadyToStart = async () => {
+    if (isCompleting) {
+      return;
+    }
+
+    try {
+      setIsCompleting(true);
+      await completeWelcome();
+
+      router.dismissAll();
+
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      console.error('Unable to complete welcome', error);
+
+      setIsCompleting(false);
+    }
   };
-
-  const handleContinueToPin = () => {
-    setShowSecuritySetup(false);
-
-    /*
-     * Replace Welcome with PIN setup so
-     * Welcome is not left behind in the
-     * navigation history.
-     */
-    router.replace('/(security)/CreatePinScreen');
-  };
-
   return (
-    <>
-      <SafeAreaView style={styles.safeArea}>
-        <SuccessInfo
+    <SafeAreaView style={styles.safeArea}>
+      <SuccessInfo
         icon={<StockWaveSuccessMark size={96} />}
         title={
           <Text style={styles.title}>
@@ -61,13 +56,7 @@ export default function WelcomeScreen() {
           />
         }
       />
-      </SafeAreaView>
-
-      <BiometricSetupModal
-        visible={showSecuritySetup}
-        onContinueToPin={handleContinueToPin}
-      />
-    </>
+    </SafeAreaView>
   );
 }
 
