@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,19 +10,24 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import StockWave from '../../assets/icons/StockWave';
+
 import AuthHeader from '../../components/common/AuthHeader';
 import { TextField } from '../../components/form/TextField';
+
+import { AlternativeSignIn } from '../../components/ui/AlternativeSignIn';
 import { Button } from '../../components/ui/Button';
+
+import { useAppSession } from '../../context/AppSessionContext';
+
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
-import { AlternativeSignIn } from '../../components/ui/AlternativeSignIn';
-import { useAppSession } from '../../context/AppSessionContext';
 
-  type Provider = 'google' | 'apple' | 'phone';
+type Provider = 'google' | 'apple';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -29,34 +35,12 @@ export default function SignInScreen() {
 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
   const [isSigningIn, setIsSigningIn] = useState(false);
-
-  const { signIn, isPhoneVerified, isAuthenticated, hasSeenWelcome } =
-    useAppSession();
-
 
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    setIsSigningIn(false);
-
-    if (!isPhoneVerified) {
-      router.replace('/(auth)/OtpVerificationScreen');
-
-      return;
-    }
-
-    if (!isPhoneVerified) {
-      router.replace('/(auth)/OtpVerificationScreen');
-
-      return;
-    }
-    router.replace('/(tabs)/home');
-  }, [isAuthenticated, hasSeenWelcome, isPhoneVerified]);
+  const { signIn } = useAppSession();
 
   const handleSignIn = async () => {
     if (isSigningIn) {
@@ -70,21 +54,25 @@ export default function SignInScreen() {
 
     if (!normalizedEmail) {
       setEmailError('Email address is required.');
+
       return;
     }
 
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       setEmailError('Enter a valid email address.');
+
       return;
     }
 
     if (!password) {
       setPasswordError('Password is required.');
+
       return;
     }
 
     if (password.length < 8) {
       setPasswordError('Password must be at least 8 characters.');
+
       return;
     }
 
@@ -92,48 +80,63 @@ export default function SignInScreen() {
       setIsSigningIn(true);
 
       await signIn(normalizedEmail, password);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to sign in.';
 
-      setPasswordError(message);
+      /*
+       * TabsLayout becomes the single source
+       * of truth for authenticated routing.
+       *
+       * It will decide whether this user needs:
+       *
+       * PhoneNumberScreen
+       * OtpVerificationScreen
+       * WelcomeScreen
+       * UnlockPinScreen
+       * or Home.
+       */
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      console.error('SIGN IN ERROR', error);
+
+      setPasswordError(
+        error instanceof Error ? error.message : 'Unable to sign in.',
+      );
+
       setIsSigningIn(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
+    if (busyProvider) {
+      return;
+    }
+
     try {
       setBusyProvider('google');
 
       // Later:
       // await signInWithGoogle();
     } catch (error) {
-      console.error('Google sign in failed:', error);
+      console.error('GOOGLE SIGN IN ERROR', error);
     } finally {
       setBusyProvider(null);
     }
   };
 
-  const handleAppleSignIn = () => {
+  const handleAppleSignIn = async () => {
+    if (busyProvider) {
+      return;
+    }
+
     try {
       setBusyProvider('apple');
 
       // Later:
       // await signInWithApple();
     } catch (error) {
-      console.error('Apple sign in failed:', error);
+      console.error('APPLE SIGN IN ERROR', error);
     } finally {
       setBusyProvider(null);
     }
-  };
-
-  const handlePhoneSignIn = () => {
-    router.push({
-      pathname: '/(auth)/PhoneAuthScreen',
-      params: {
-        mode: 'sign-in',
-      },
-    });
   };
 
   const formIsIncomplete = !email.trim() || !password;
@@ -176,39 +179,38 @@ export default function SignInScreen() {
                 }}
               />
 
-              <View>
-                <TextField
-                  placeholder="Password"
-                  value={password}
-                  error={passwordError}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="current-password"
-                  textContentType="password"
-                  returnKeyType="done"
-                  onSubmitEditing={handleSignIn}
-                  onChangeText={(value) => {
-                    setPassword(value);
+              <TextField
+                placeholder="Password"
+                value={password}
+                error={passwordError}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={handleSignIn}
+                onChangeText={(value) => {
+                  setPassword(value);
 
-                    if (passwordError) {
-                      setPasswordError('');
-                    }
-                  }}
-                />
-              </View>
+                  if (passwordError) {
+                    setPasswordError('');
+                  }
+                }}
+              />
             </View>
 
             <Button
               title="Sign in"
               variant="primary"
               loading={isSigningIn}
-              disabled={formIsIncomplete}
+              disabled={formIsIncomplete || isSigningIn}
               onPress={handleSignIn}
             />
 
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Forgot password"
               hitSlop={8}
               style={styles.forgotPasswordButton}
               onPress={() => {
@@ -221,8 +223,8 @@ export default function SignInScreen() {
             <AlternativeSignIn
               onGooglePress={handleGoogleSignIn}
               onApplePress={handleAppleSignIn}
-              onPhonePress={handlePhoneSignIn}
-              busyProvider={busyProvider}
+              busyProvider={busyProvider} 
+              onPhonePress={() => {console.log("No auth here!")}}         
             />
           </View>
 
@@ -231,6 +233,7 @@ export default function SignInScreen() {
 
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Sign up"
               hitSlop={8}
               onPress={() => {
                 router.replace('/(auth)/sign-up');
@@ -278,27 +281,6 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     ...getTypography('bodyMedium', 'semiBold'),
     color: colors.primary[100],
-  },
-
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.neutral[100],
-  },
-
-  dividerText: {
-    ...getTypography('bodySmall'),
-    color: colors.neutral[400],
-  },
-
-  socialButtons: {
-    gap: spacing[3],
   },
 
   footer: {

@@ -51,19 +51,19 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function requestPhoneAuth(phone: string, mode: PhoneAuthMode) {
-  const { error } = await supabase.auth.signInWithOtp({
-    phone: phone.trim(),
+// export async function requestPhoneAuth(phone: string, mode: PhoneAuthMode) {
+//   const { error } = await supabase.auth.signInWithOtp({
+//     phone: phone.trim(),
 
-    options: {
-      shouldCreateUser: mode === 'sign-up',
-    },
-  });
+//     options: {
+//       shouldCreateUser: mode === 'sign-up',
+//     },
+//   });
 
-  if (error) {
-    throw error;
-  }
-}
+//   if (error) {
+//     throw error;
+//   }
+// }
 
 export async function requestPasswordReset(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -111,65 +111,65 @@ export async function updateRecoveredPassword(password: string) {
   }
 }
 
-export async function requestPhoneVerification(phone: string) {
-  const normalizedPhone = phone.trim();
+// export async function requestPhoneVerification(phone: string) {
+//   const normalizedPhone = phone.trim();
 
-  const { data, error } = await supabase.auth.updateUser({
-    phone: normalizedPhone,
+//   const { data, error } = await supabase.auth.updateUser({
+//     phone: normalizedPhone,
 
-    data: {
-      /*
-       * Temporarily save this so the OTP
-       * flow can recover it if necessary.
-       */
-      registration_phone: normalizedPhone,
-    },
-  });
+//     data: {
+//       /*
+//        * Temporarily save this so the OTP
+//        * flow can recover it if necessary.
+//        */
+//       registration_phone: normalizedPhone,
+//     },
+//   });
 
-  if (error) {
-    throw error;
-  }
+//   if (error) {
+//     throw error;
+//   }
 
-  return data;
-}
+//   return data;
+// }
 
-export async function verifyPhoneChange(phone: string, token: string) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone: phone.trim(),
-    token: token.trim(),
-    type: 'phone_change',
-  });
+// export async function verifyPhoneChange(phone: string, token: string) {
+//   const { data, error } = await supabase.auth.verifyOtp({
+//     phone: phone.trim(),
+//     token: token.trim(),
+//     type: 'phone_change',
+//   });
 
-  if (error) {
-    throw error;
-  }
+//   if (error) {
+//     throw error;
+//   }
 
-  const { error: metadataError } = await supabase.auth.updateUser({
-    data: {
-      registration_phone: null,
-    },
-  });
+//   const { error: metadataError } = await supabase.auth.updateUser({
+//     data: {
+//       registration_phone: null,
+//     },
+//   });
 
-  if (metadataError) {
-    console.warn(
-      'Unable to clear temporary phone metadata:',
-      metadataError.message,
-    );
-  }
+//   if (metadataError) {
+//     console.warn(
+//       'Unable to clear temporary phone metadata:',
+//       metadataError.message,
+//     );
+//   }
 
-  return data;
-}
+//   return data;
+// }
 
-export async function resendPhoneVerification(phone: string) {
-  const { error } = await supabase.auth.resend({
-    type: 'phone_change',
-    phone: phone.trim(),
-  });
+// export async function resendPhoneVerification(phone: string) {
+//   const { error } = await supabase.auth.resend({
+//     type: 'phone_change',
+//     phone: phone.trim(),
+//   });
 
-  if (error) {
-    throw error;
-  }
-}
+//   if (error) {
+//     throw error;
+//   }
+// }
 
 export async function markWelcomeSeen() {
   const { data, error } = await supabase.auth.updateUser({
@@ -193,37 +193,37 @@ export async function signOut() {
   }
 }
 
-export async function verifyPhoneAuthOtp(
-  phone: string,
-  token: string,
-) {
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth
-      .verifyOtp({
-        phone:
-          phone.trim(),
+// export async function verifyPhoneAuthOtp(
+//   phone: string,
+//   token: string,
+// ) {
+//   const {
+//     data,
+//     error,
+//   } =
+//     await supabase.auth
+//       .verifyOtp({
+//         phone:
+//           phone.trim(),
 
-        token:
-          token.trim(),
+//         token:
+//           token.trim(),
 
-        type: 'sms',
-      });
+//         type: 'sms',
+//       });
 
-  if (error) {
-    throw error;
-  }
+//   if (error) {
+//     throw error;
+//   }
 
-  if (!data.session) {
-    throw new Error(
-      'Unable to start phone authentication session.',
-    );
-  }
+//   if (!data.session) {
+//     throw new Error(
+//       'Unable to start phone authentication session.',
+//     );
+//   }
 
-  return data;
-}
+//   return data;
+// }
 
 export async function completePhoneSignUpProfile(
   username: string,
@@ -242,6 +242,92 @@ export async function completePhoneSignUpProfile(
             false,
         },
       });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+
+export type InAppVerificationChallenge = {
+  code: string;
+  expiresAt: string;
+};
+
+export async function startInAppVerification(): Promise<InAppVerificationChallenge> {
+  const { data, error } = await supabase.rpc(
+    'start_in_app_verification',
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const challenge = Array.isArray(data)
+    ? data[0]
+    : data;
+
+  if (!challenge?.code || !challenge?.expires_at) {
+    throw new Error(
+      'Unable to create verification challenge.',
+    );
+  }
+
+  return {
+    code: challenge.code,
+    expiresAt: challenge.expires_at,
+  };
+}
+
+export async function verifyInAppVerification(
+  code: string,
+) {
+  const { data, error } = await supabase.rpc(
+    'verify_in_app_verification',
+    {
+      p_code: code.trim(),
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (data !== true) {
+    throw new Error(
+      'The verification code is invalid or has expired.',
+    );
+  }
+}
+
+export async function getInAppVerificationStatus(
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from('user_verification_state')
+    .select('verification_completed_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data?.verification_completed_at);
+}
+
+export async function saveRegistrationPhone(
+  phone: string,
+  countryCode: string,
+) {
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      registration_phone: phone.trim(),
+      registration_country_code: countryCode,
+    },
+  });
 
   if (error) {
     throw error;

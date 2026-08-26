@@ -1,255 +1,184 @@
-import { Redirect, Tabs, router } from 'expo-router';
+
+import { Redirect, Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import HomeTabIcon from '../../assets/icons/HomeTabIcon';
-import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
-import SwapTabIcon from '../../assets/icons/SwapTabIcon';
+
 import MarketTabIcon from '../../assets/icons/MarketTabIcon';
+
+import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
+
 import ProfileTabIcon from '../../assets/icons/ProfileTabIcon';
 
-import { BiometricSetupModal } from
-  '../../components/modals/BiometricSetupModal';
+import SwapTabIcon from '../../assets/icons/SwapTabIcon';
 
-import { useAppSession } from
-  '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
   const {
     isSessionReady,
+    isVerificationReady,
     isDeviceSecurityReady,
 
     isAuthenticated,
-    isPhoneVerified,
-    hasSeenWelcome,
 
-    pendingPhone,
+    hasRegistrationPhone,
+    hasCompletedVerification,
+    hasSeenWelcome,
 
     pinCreated,
     isAppUnlocked,
   } = useAppSession();
 
-  if (
-    !isSessionReady ||
-    !isDeviceSecurityReady
-  ) {
+  if (!isSessionReady || !isVerificationReady || !isDeviceSecurityReady) {
     return null;
   }
 
   if (!isAuthenticated) {
-    return (
-      <Redirect
-        href="/(auth)/sign-in"
-      />
-    );
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
-  if (!isPhoneVerified) {
-    return (
-      <Redirect
-        href={
-          pendingPhone
-            ? '/(auth)/OtpVerificationScreen'
-            : '/(auth)/PhoneNumberScreen'
-        }
-      />
-    );
+  if (!hasRegistrationPhone) {
+    return <Redirect href="/(auth)/PhoneNumberScreen" />;
   }
 
+  if (!hasCompletedVerification) {
+    return <Redirect href="/(auth)/OtpVerificationScreen" />;
+  }
+
+  /*
+   * Welcome/security setup hasn't
+   * been fully completed.
+   */
   if (!hasSeenWelcome) {
-    return (
-      <Redirect
-        href="/(auth)/WelcomeScreen"
-      />
-    );
+    return <Redirect href="/(auth)/WelcomeScreen" />;
   }
 
-  if (
-    pinCreated &&
-    !isAppUnlocked
-  ) {
-    return (
-      <Redirect
-        href="/(security)/UnlockPinScreen"
-      />
-    );
+  if (pinCreated && !isAppUnlocked) {
+    return <Redirect href="/(security)/UnlockPinScreen" />;
   }
-
-  const needsSecuritySetup =
-    !pinCreated;
 
   return (
-    <>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
+    <Tabs
+      screenOptions={{
+        headerShown: false,
 
-          tabBarShowLabel: false,
+        tabBarShowLabel: false,
 
-          tabBarActiveTintColor:
-            colors.neutral[800],
+        tabBarActiveTintColor: colors.neutral[800],
 
-          tabBarInactiveTintColor:
-            colors.neutral[400],
+        tabBarInactiveTintColor: colors.neutral[400],
 
-          tabBarStyle:
-            styles.tabBar,
+        tabBarStyle: styles.tabBar,
 
-          tabBarItemStyle:
-            styles.tabBarItem,
+        tabBarItemStyle: styles.tabBarItem,
 
-          tabBarIconStyle:
-            styles.tabBarIcon,
-        }}
-      >
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Home',
+        tabBarIconStyle: styles.tabBarIcon,
+      }}
+    >
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Home',
 
-            tabBarIcon: ({
-              color,
-              focused,
-            }) => (
-              <HomeTabIcon
-                size={30}
-                color={color}
-                focused={focused}
-              />
-            ),
-          }}
-        />
-
-        <Tabs.Screen
-          name="portfolio"
-          options={{
-            title: 'Portfolio',
-
-            tabBarIcon: ({
-              color,
-              focused,
-            }) => (
-              <PortfolioTabIcon
-                size={30}
-                color={color}
-                focused={focused}
-              />
-            ),
-          }}
-        />
-
-        <Tabs.Screen
-          name="swap"
-          options={{
-            title: 'Swap',
-
-            tabBarIcon: () => (
-              <View
-                style={
-                  styles.swapButton
-                }
-              >
-                <SwapTabIcon
-                  size={24}
-                  color={
-                    colors.other.white
-                  }
-                />
-              </View>
-            ),
-          }}
-        />
-
-        <Tabs.Screen
-          name="market"
-          options={{
-            title: 'Market',
-
-            tabBarIcon: ({
-              color,
-              focused,
-            }) => (
-              <MarketTabIcon
-                size={30}
-                color={color}
-                focused={focused}
-              />
-            ),
-          }}
-        />
-
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-
-            tabBarIcon: ({
-              color,
-              focused,
-            }) => (
-              <ProfileTabIcon
-                size={30}
-                color={color}
-                focused={focused}
-              />
-            ),
-          }}
-        />
-      </Tabs>
-
-      <BiometricSetupModal
-        visible={
-          needsSecuritySetup
-        }
-        onContinueToPin={() => {
-          router.replace(
-            '/(security)/CreatePinScreen',
-          );
+          tabBarIcon: ({ color, focused }) => (
+            <HomeTabIcon size={30} color={color} focused={focused} />
+          ),
         }}
       />
-    </>
+
+      <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: 'Portfolio',
+
+          tabBarIcon: ({ color, focused }) => (
+            <PortfolioTabIcon size={30} color={color} focused={focused} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="swap"
+        options={{
+          title: 'Swap',
+
+          tabBarIcon: () => (
+            <View style={styles.swapButton}>
+              <SwapTabIcon size={24} color={colors.other.white} />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="market"
+        options={{
+          title: 'Market',
+
+          tabBarIcon: ({ color, focused }) => (
+            <MarketTabIcon size={30} color={color} focused={focused} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+
+          tabBarIcon: ({ color, focused }) => (
+            <ProfileTabIcon size={30} color={color} focused={focused} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    tabBar: {
-      height: 67,
-      paddingTop: 8,
-      paddingBottom: 10,
-      paddingHorizontal: 22,
+const styles = StyleSheet.create({
+  tabBar: {
+    height: 67,
 
-      borderTopWidth: 1,
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 22,
 
-      borderTopColor:
-        colors.neutral[50],
+    borderTopWidth: 1,
 
-      backgroundColor:
-        colors.other.white,
-    },
+    borderTopColor: colors.neutral[50],
 
-    tabBarItem: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 0,
-    },
+    backgroundColor: colors.other.white,
+  },
 
-    tabBarIcon: {
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+  tabBarItem: {
+    flex: 1,
 
-    swapButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+    alignItems: 'center',
 
-      alignItems: 'center',
-      justifyContent: 'center',
+    justifyContent: 'center',
 
-      backgroundColor:
-        colors.primary[100],
-    },
-  });
+    paddingHorizontal: 0,
+  },
+
+  tabBarIcon: {
+    alignItems: 'center',
+
+    justifyContent: 'center',
+  },
+
+  swapButton: {
+    width: 40,
+    height: 40,
+
+    borderRadius: 20,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    backgroundColor: colors.primary[100],
+  },
+});

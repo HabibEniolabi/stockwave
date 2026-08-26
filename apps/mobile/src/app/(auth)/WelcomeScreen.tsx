@@ -1,24 +1,25 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { SuccessInfo } from '../../components/common/SuccessInfo';
 import { Button } from '../../components/ui/Button';
+import { useAppSession } from '../../context/AppSessionContext';
 import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
+
 import { getTypography } from '../../theme/typography';
 import { ConfettiAnimation } from '../../components/animations/ConfettiAnimation';
 import { StockWaveSuccessMark } from '../../components/branding/StockWaveSuccessMark';
-import { useAppSession } from '../../context/AppSessionContext';
-import { useState } from 'react';
+import { SuccessInfo } from '../../components/common/SuccessInfo';
 
 export default function WelcomeScreen() {
-  const { completeWelcome, user } = useAppSession();
-
   const [isCompleting, setIsCompleting] = useState(false);
 
-  const username = user?.user_metadata?.username;
+  const { completeWelcome, user } = useAppSession();
 
-  const handleContinue = async () => {
+  const username = user?.user_metadata?.username ?? 'there';
+
+  const handleReadyToStart = async () => {
     if (isCompleting) {
       return;
     }
@@ -26,6 +27,8 @@ export default function WelcomeScreen() {
     try {
       setIsCompleting(true);
       await completeWelcome();
+
+      router.dismissAll();
 
       router.replace('/(tabs)/home');
     } catch (error) {
@@ -49,7 +52,7 @@ export default function WelcomeScreen() {
           <Button
             title="I’m ready to start!"
             variant="primary"
-            onPress={handleContinue}
+            onPress={handleReadyToStart}
           />
         }
       />
@@ -63,9 +66,44 @@ const styles = StyleSheet.create({
     backgroundColor: colors.other.white,
   },
 
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[8],
+    paddingBottom: spacing[4],
+  },
+
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[8],
+  },
+
+  textContainer: {
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+
   title: {
     ...getTypography('heading4', 'bold'),
     color: colors.neutral[900],
     textAlign: 'center',
+  },
+
+  description: {
+    ...getTypography('bodyMedium'),
+    maxWidth: 320,
+    color: colors.neutral[500],
+    textAlign: 'center',
+  },
+
+  footer: {
+    paddingTop: spacing[6],
   },
 });
