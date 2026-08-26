@@ -19,7 +19,6 @@ import {
   requestPasswordReset,
   saveRegistrationPhone as saveRegistrationPhoneMetadata,
   signInWithEmail,
-  signOut,
   signUpWithEmail,
   startInAppVerification,
   updateRecoveredPassword,
@@ -642,62 +641,123 @@ export function AppSessionProvider({
     };
 
   const signOutCurrentDevice =
-    async () => {
-      const userId =
-        user?.id;
-
-      if (userId) {
-        await clearDeviceSecurity(
-          userId,
-        );
-      }
-
-      const { error } =
-        await supabase.auth.signOut({
+  async () => {
+    const {
+      error,
+    } =
+      await supabase.auth
+        .signOut({
           scope: 'local',
         });
 
-      if (error) {
-        throw error;
-      }
+    if (error) {
+      throw error;
+    }
 
-      syncSession(null);
+    /*
+     * IMPORTANT:
+     *
+     * Do not call clearDeviceSecurity()
+     * here.
+     *
+     * Ordinary logout should preserve the
+     * PIN/biometric configuration belonging
+     * to this user on this installation.
+     */
+    syncSession(null);
 
-      setPinCreated(false);
-      setBiometricEnabled(false);
-      setIsAppUnlocked(false);
-      setIsDeviceSecurityReady(true);
-      setIsVerificationReady(true);
-    };
+    /*
+     * Clear in-memory state because there
+     * is currently no authenticated user.
+     *
+     * The persisted PIN/biometric values
+     * have NOT been deleted.
+     */
+    setPinCreated(false);
+
+    setBiometricEnabled(
+      false,
+    );
+
+    setIsAppUnlocked(false);
+
+    setIsDeviceSecurityReady(
+      true,
+    );
+
+    setIsVerificationReady(
+      true,
+    );
+  };
 
   const resetSession =
-    async () => {
-      const userId =
-        user?.id;
+  async () => {
+    const userId =
+      user?.id;
 
-      if (userId) {
-        await clearDeviceSecurity(
-          userId,
-        );
-      }
-
-      await signOut();
-
-      syncSession(null);
-
-      setPinCreated(false);
-      setBiometricEnabled(false);
-      setIsAppUnlocked(false);
-
-      setResetPasswordEmail('');
-
-      setResetPasswordVerified(
-        false,
+    /*
+     * This IS destructive cleanup.
+     *
+     * Used after account deletion or
+     * a genuine full local reset.
+     */
+    if (userId) {
+      await clearDeviceSecurity(
+        userId,
       );
+    }
 
-      setIsDeviceSecurityReady(true);
-      setIsVerificationReady(true);
-    };
+    /*
+     * Account deletion may already have
+     * invalidated the backend session.
+     *
+     * We still need to ensure the client
+     * removes its local Supabase session.
+     */
+    const {
+      error,
+    } =
+      await supabase.auth
+        .signOut({
+          scope: 'local',
+        });
+
+    if (error) {
+      console.warn(
+        'Unable to complete remote sign out during reset:',
+        error,
+      );
+    }
+
+    /*
+     * Always reset application state even
+     * if the deleted session is already
+     * invalid server-side.
+     */
+    syncSession(null);
+
+    setPinCreated(false);
+
+    setBiometricEnabled(
+      false,
+    );
+
+    setIsAppUnlocked(false);
+
+    setResetPasswordEmail('');
+
+    setResetPasswordVerified(
+      false,
+    );
+
+    setIsDeviceSecurityReady(
+      true,
+    );
+
+    setIsVerificationReady(
+      true,
+    );
+  };
 
   return (
     <AppSessionContext.Provider
