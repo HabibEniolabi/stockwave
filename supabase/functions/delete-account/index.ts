@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
 
 const corsHeaders = {
