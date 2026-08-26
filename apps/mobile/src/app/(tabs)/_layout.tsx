@@ -1,11 +1,19 @@
-import { Redirect, Tabs, router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import {
+  Redirect,
+  Tabs,
+  router,
+} from 'expo-router';
+
+import {
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import HomeTabIcon from '../../assets/icons/HomeTabIcon';
-import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
-import SwapTabIcon from '../../assets/icons/SwapTabIcon';
 import MarketTabIcon from '../../assets/icons/MarketTabIcon';
+import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
 import ProfileTabIcon from '../../assets/icons/ProfileTabIcon';
+import SwapTabIcon from '../../assets/icons/SwapTabIcon';
 
 import { BiometricSetupModal } from
   '../../components/modals/BiometricSetupModal';
@@ -18,26 +26,32 @@ import { colors } from '../../theme/colors';
 export default function TabsLayout() {
   const {
     isSessionReady,
+    isVerificationReady,
     isDeviceSecurityReady,
 
     isAuthenticated,
-    isPhoneVerified,
-    hasSeenWelcome,
 
-    pendingPhone,
+    hasRegistrationPhone,
+    hasCompletedVerification,
+    hasSeenWelcome,
 
     pinCreated,
     isAppUnlocked,
   } = useAppSession();
 
-  if (
-    !isSessionReady ||
-    !isDeviceSecurityReady
-  ) {
+  if (!isSessionReady) {
     return null;
   }
 
-  if (!isAuthenticated) {
+  /*
+   * A user can access the tabs either as:
+   *
+   * 1. An authenticated StockWave user.
+   * 2. A guest who explicitly skipped authentication.
+   */
+  if (
+    !isAuthenticated
+  ) {
     return (
       <Redirect
         href="/(auth)/sign-in"
@@ -45,38 +59,70 @@ export default function TabsLayout() {
     );
   }
 
-  if (!isPhoneVerified) {
-    return (
-      <Redirect
-        href={
-          pendingPhone
-            ? '/(auth)/OtpVerificationScreen'
-            : '/(auth)/PhoneNumberScreen'
-        }
-      />
-    );
+  /*
+   * Registration guards apply only
+   * to authenticated users.
+   *
+   * Guests should never be pushed into
+   * phone verification, welcome or PIN setup.
+   */
+  if (isAuthenticated) {
+    if (
+      !isVerificationReady ||
+      !isDeviceSecurityReady
+    ) {
+      return null;
+    }
+
+    if (!hasRegistrationPhone) {
+      return (
+        <Redirect
+          href="/(auth)/PhoneNumberScreen"
+        />
+      );
+    }
+
+    if (!hasCompletedVerification) {
+      return (
+        <Redirect
+          href="/(auth)/OtpVerificationScreen"
+        />
+      );
+    }
+
+    if (!hasSeenWelcome) {
+      return (
+        <Redirect
+          href="/(auth)/WelcomeScreen"
+        />
+      );
+    }
+
+    if (
+      pinCreated &&
+      !isAppUnlocked
+    ) {
+      return (
+        <Redirect
+          href="/(security)/UnlockPinScreen"
+        />
+      );
+    }
   }
 
-  if (!hasSeenWelcome) {
-    return (
-      <Redirect
-        href="/(auth)/WelcomeScreen"
-      />
-    );
-  }
-
-  if (
-    pinCreated &&
-    !isAppUnlocked
-  ) {
-    return (
-      <Redirect
-        href="/(security)/UnlockPinScreen"
-      />
-    );
-  }
-
+  /*
+   * Security setup is only required for
+   * fully registered authenticated users.
+   *
+   * Never show this modal to guests.
+   */
   const needsSecuritySetup =
+    isAuthenticated &&
+    isVerificationReady &&
+    isDeviceSecurityReady &&
+    hasRegistrationPhone &&
+    hasCompletedVerification &&
+    hasSeenWelcome &&
     !pinCreated;
 
   return (
@@ -84,7 +130,6 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-
           tabBarShowLabel: false,
 
           tabBarActiveTintColor:
@@ -216,6 +261,7 @@ const styles =
   StyleSheet.create({
     tabBar: {
       height: 67,
+
       paddingTop: 8,
       paddingBottom: 10,
       paddingHorizontal: 22,
@@ -231,8 +277,10 @@ const styles =
 
     tabBarItem: {
       flex: 1,
+
       alignItems: 'center',
       justifyContent: 'center',
+
       paddingHorizontal: 0,
     },
 
@@ -244,6 +292,7 @@ const styles =
     swapButton: {
       width: 40,
       height: 40,
+
       borderRadius: 20,
 
       alignItems: 'center',

@@ -56,7 +56,7 @@ export default function WalkthroughScreen() {
   };
 
   const handleSkip = () => {
-    router.replace('/(tabs)/home');
+    router.replace('/(auth)/sign-up');
   };
 
   return (

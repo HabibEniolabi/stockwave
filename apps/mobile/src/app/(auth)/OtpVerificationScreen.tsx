@@ -31,7 +31,7 @@ import { getTypography } from '../../theme/typography';
 
 const OTP_LENGTH = 6;
 const SUCCESS_DELAY = 900;
-const RESEND_COOLDOWN = 60;
+const RESEND_COOLDOWN = 6000;
 
 export default function OtpVerificationScreen() {
   const [verificationCode, setVerificationCode] = useState('');

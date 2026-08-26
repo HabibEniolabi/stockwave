@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import {
   KeyboardAvoidingView,
@@ -32,55 +32,15 @@ type Provider = 'google' | 'apple';
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
   const [isSigningIn, setIsSigningIn] = useState(false);
+
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
 
-  const {
-    signIn,
-
-    isAuthenticated,
-    isVerificationReady,
-
-    hasRegistrationPhone,
-    hasCompletedVerification,
-    hasSeenWelcome,
-  } = useAppSession();
-
-  useEffect(() => {
-    if (!isAuthenticated || !isVerificationReady) {
-      return;
-    }
-
-    setIsSigningIn(false);
-
-    if (!hasRegistrationPhone) {
-      router.replace('/(auth)/PhoneNumberScreen');
-
-      return;
-    }
-
-    if (!hasCompletedVerification) {
-      router.replace('/(auth)/OtpVerificationScreen');
-
-      return;
-    }
-
-    if (!hasSeenWelcome) {
-      router.replace('/(auth)/WelcomeScreen');
-
-      return;
-    }
-
-    router.replace('/(tabs)/home');
-  }, [
-    isAuthenticated,
-    isVerificationReady,
-    hasRegistrationPhone,
-    hasCompletedVerification,
-    hasSeenWelcome,
-  ]);
+  const { signIn } = useAppSession();
 
   const handleSignIn = async () => {
     if (isSigningIn) {
@@ -120,6 +80,20 @@ export default function SignInScreen() {
       setIsSigningIn(true);
 
       await signIn(normalizedEmail, password);
+
+      /*
+       * TabsLayout becomes the single source
+       * of truth for authenticated routing.
+       *
+       * It will decide whether this user needs:
+       *
+       * PhoneNumberScreen
+       * OtpVerificationScreen
+       * WelcomeScreen
+       * UnlockPinScreen
+       * or Home.
+       */
+      router.replace('/(tabs)/home');
     } catch (error) {
       console.error('SIGN IN ERROR', error);
 
@@ -250,8 +224,8 @@ export default function SignInScreen() {
               onGooglePress={handleGoogleSignIn}
               onApplePress={handleAppleSignIn}
               busyProvider={busyProvider} 
-              onPhonePress={() => {console.log("No action here")}}            
-              />
+              onPhonePress={() => {console.log("No auth here!")}}         
+            />
           </View>
 
           <View style={styles.footer}>
