@@ -1,31 +1,25 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
+  // Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import * as LocalAuthentication from
-  'expo-local-authentication';
+import * as LocalAuthentication from 'expo-local-authentication';
 
-import { AnimatedFaceIdIcon } from
-  '../animations/AnimatedFaceIdIcon';
+import { AnimatedFaceIdIcon } from '../animations/AnimatedFaceIdIcon';
 import { AppIcon } from '../icons/AppIcon';
 import { Button } from '../ui/Button';
 
-import { useAppSession } from
-  '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { getTypography } from '../../theme/typography';
 
-type BiometricMode =
-  | 'face'
-  | 'fingerprint'
-  | 'unsupported';
+type BiometricMode = 'face' | 'fingerprint' | 'unsupported';
 
 type BiometricSetupModalProps = {
   visible: boolean;
@@ -36,90 +30,65 @@ export function BiometricSetupModal({
   visible,
   onContinueToPin,
 }: BiometricSetupModalProps) {
-  const {
-    enableBiometrics,
-  } = useAppSession();
+  const { enableBiometrics } = useAppSession();
 
-  const [mode, setMode] =
-    useState<BiometricMode>('unsupported');
+  const [mode, setMode] = useState<BiometricMode>('unsupported');
 
-  const [isChecking, setIsChecking] =
-    useState(true);
+  const [isChecking, setIsChecking] = useState(true);
 
-  const [
-    isAuthenticating,
-    setIsAuthenticating,
-  ] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const [error, setError] =
-    useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    const detectBiometricType =
-      async () => {
-        setIsChecking(true);
-        setError('');
+    const detectBiometricType = async () => {
+      setIsChecking(true);
+      setError('');
 
-        try {
-          const hasHardware =
-            await LocalAuthentication
-              .hasHardwareAsync();
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
 
-          const enrolled =
-            await LocalAuthentication
-              .isEnrolledAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
 
-          if (
-            !hasHardware ||
-            !enrolled
-          ) {
-            setMode('unsupported');
-            return;
-          }
-
-          const supportedTypes =
-            await LocalAuthentication
-              .supportedAuthenticationTypesAsync();
-
-          const supportsFace =
-            supportedTypes.includes(
-              LocalAuthentication
-                .AuthenticationType
-                .FACIAL_RECOGNITION,
-            );
-
-          const supportsFingerprint =
-            supportedTypes.includes(
-              LocalAuthentication
-                .AuthenticationType
-                .FINGERPRINT,
-            );
-
-          if (supportsFace) {
-            setMode('face');
-            return;
-          }
-
-          if (supportsFingerprint) {
-            setMode('fingerprint');
-            return;
-          }
-
+        if (!hasHardware || !enrolled) {
           setMode('unsupported');
-        } catch {
-          setMode('unsupported');
-
-          setError(
-            'Unable to check biometric authentication.',
-          );
-        } finally {
-          setIsChecking(false);
+          return;
         }
-      };
+
+        const supportedTypes =
+          await LocalAuthentication.supportedAuthenticationTypesAsync();
+
+        const supportsFace = supportedTypes.includes(
+          LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION,
+        );
+
+        const supportsFingerprint = supportedTypes.includes(
+          LocalAuthentication.AuthenticationType.FINGERPRINT,
+        );
+
+        if (supportsFace) {
+          setMode('face');
+          return;
+        }
+
+        if (supportsFingerprint) {
+          setMode('fingerprint');
+          return;
+        }
+
+        setMode('unsupported');
+      } catch {
+        setMode('unsupported');
+
+        setError('Unable to check biometric authentication.');
+      } finally {
+        setIsChecking(false);
+      }
+    };
 
     detectBiometricType();
   }, [visible]);
@@ -128,78 +97,63 @@ export function BiometricSetupModal({
     onContinueToPin();
   };
 
-  const handleEnableBiometrics =
-    async () => {
-      if (
-        mode === 'unsupported' ||
-        isAuthenticating
-      ) {
+  const handleEnableBiometrics = async () => {
+    if (mode === 'unsupported' || isAuthenticating) {
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setError('');
+
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage:
+          mode === 'face'
+            ? 'Enable Face ID for StockWave'
+            : 'Enable fingerprint for StockWave',
+
+        cancelLabel: 'Cancel',
+
+        fallbackLabel: 'Use device passcode',
+
+        disableDeviceFallback: false,
+      });
+
+      if (!result.success) {
+        if (
+          result.error !== 'user_cancel' &&
+          result.error !== 'system_cancel'
+        ) {
+          setError('Biometric authentication was not completed.');
+        }
+
         return;
       }
 
-      setIsAuthenticating(true);
-      setError('');
+      await enableBiometrics();
+      onContinueToPin();
+    } catch {
+      setError('Unable to complete biometric authentication.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
-      try {
-        const result =
-          await LocalAuthentication
-            .authenticateAsync({
-              promptMessage:
-                mode === 'face'
-                  ? 'Enable Face ID for StockWave'
-                  : 'Enable fingerprint for StockWave',
+  const isFaceId = mode === 'face';
 
-              cancelLabel: 'Cancel',
-
-              fallbackLabel:
-                'Use device passcode',
-
-              disableDeviceFallback:
-                false,
-            });
-
-        if (!result.success) {
-          if (
-            result.error !==
-              'user_cancel' &&
-            result.error !==
-              'system_cancel'
-          ) {
-            setError(
-              'Biometric authentication was not completed.',
-            );
-          }
-
-          return;
-        }
-
-        enableBiometrics();
-        onContinueToPin();
-      } catch {
-        setError(
-          'Unable to complete biometric authentication.',
-        );
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
-
-  const isFaceId =
-    mode === 'face';
-
-  const isUnsupported =
-    mode === 'unsupported';
+  const isUnsupported = mode === 'unsupported';
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={
-        handleUsePinInstead
-      }
-    >
+    // <Modal
+    //   transparent
+    //   visible={visible}
+    //   animationType="slide"
+    //   statusBarTranslucent
+    //   onRequestClose={
+    //     handleUsePinInstead
+    //   }
+    // >
+    <View style={styles.modalRoot}>
       <View style={styles.overlay}>
         {/*
           Don't make this Pressable.
@@ -208,74 +162,41 @@ export function BiometricSetupModal({
           so tapping the backdrop should
           not dismiss the flow.
         */}
-        <View
-          style={
-            StyleSheet.absoluteFill
-          }
-        />
+        <View style={StyleSheet.absoluteFill} />
 
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
           {isChecking ? (
-            <View
-              style={
-                styles.loadingContainer
-              }
-            >
-              <ActivityIndicator
-                size="large"
-                color={
-                  colors.primary[100]
-                }
-              />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary[100]} />
 
-              <Text
-                style={
-                  styles.loadingText
-                }
-              >
-                Checking device
-                security...
+              <Text style={styles.loadingText}>
+                Checking device security...
               </Text>
             </View>
           ) : (
             <>
-              <View
-                style={styles.content}
-              >
-                <View
-                  style={
-                    styles.iconContainer
-                  }
-                >
+              <View style={styles.content}>
+                <View style={styles.iconContainer}>
                   {mode === 'face' ? (
-                    <AnimatedFaceIdIcon
-                      size={72}
-                    />
-                  ) : mode ===
-                    'fingerprint' ? (
+                    <AnimatedFaceIdIcon size={72} />
+                  ) : mode === 'fingerprint' ? (
                     <AppIcon
                       name="fingerprint"
                       size={72}
-                      color={
-                        colors.primary[100]
-                      }
+                      color={colors.primary[100]}
                     />
                   ) : (
                     <AppIcon
                       name="fingerprint"
                       size={72}
-                      color={
-                        colors.neutral[400]
-                      }
+                      color={colors.neutral[400]}
                     />
                   )}
                 </View>
 
-                <Text
-                  style={styles.title}
-                >
+                <Text style={styles.title}>
                   {isUnsupported
                     ? 'Secure your account'
                     : isFaceId
@@ -283,11 +204,7 @@ export function BiometricSetupModal({
                       : 'Set up fingerprint'}
                 </Text>
 
-                <Text
-                  style={
-                    styles.description
-                  }
-                >
+                <Text style={styles.description}>
                   {isUnsupported
                     ? 'Biometric authentication is unavailable on this device. Create a PIN to secure StockWave.'
                     : isFaceId
@@ -295,63 +212,33 @@ export function BiometricSetupModal({
                       : 'Use your fingerprint for faster and more secure access to StockWave.'}
                 </Text>
 
-                {error ? (
-                  <Text
-                    style={
-                      styles.error
-                    }
-                  >
-                    {error}
-                  </Text>
-                ) : null}
+                {error ? <Text style={styles.error}>{error}</Text> : null}
               </View>
 
-              <View
-                style={styles.actions}
-              >
+              <View style={styles.actions}>
                 {isUnsupported ? (
                   <Button
                     title="Create PIN"
                     variant="primary"
-                    onPress={
-                      handleUsePinInstead
-                    }
+                    onPress={handleUsePinInstead}
                   />
                 ) : (
                   <>
                     <Button
-                      title={
-                        isFaceId
-                          ? 'Enable Face ID'
-                          : 'Enable fingerprint'
-                      }
+                      title={isFaceId ? 'Enable Face ID' : 'Enable fingerprint'}
                       variant="primary"
-                      loading={
-                        isAuthenticating
-                      }
-                      onPress={
-                        handleEnableBiometrics
-                      }
+                      loading={isAuthenticating}
+                      onPress={handleEnableBiometrics}
                     />
 
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="Use PIN instead"
                       hitSlop={10}
-                      style={
-                        styles.laterButton
-                      }
-                      onPress={
-                        handleUsePinInstead
-                      }
+                      style={styles.laterButton}
+                      onPress={handleUsePinInstead}
                     >
-                      <Text
-                        style={
-                          styles.laterText
-                        }
-                      >
-                        Use PIN instead
-                      </Text>
+                      <Text style={styles.laterText}>Use PIN instead</Text>
                     </Pressable>
                   </>
                 )}
@@ -360,16 +247,21 @@ export function BiometricSetupModal({
           )}
         </View>
       </View>
-    </Modal>
+    </View>
+    // {/* </Modal> */}
   );
 }
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor:
-      'rgba(13, 13, 18, 0.35)',
+    backgroundColor: 'rgba(13, 13, 18, 0.35)',
   },
 
   sheet: {
@@ -379,8 +271,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[6],
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    backgroundColor:
-      colors.other.white,
+    backgroundColor: colors.other.white,
   },
 
   handle: {
@@ -388,8 +279,7 @@ const styles = StyleSheet.create({
     height: 5,
     alignSelf: 'center',
     borderRadius: 999,
-    backgroundColor:
-      colors.neutral[100],
+    backgroundColor: colors.neutral[100],
   },
 
   loadingContainer: {
@@ -400,9 +290,7 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
-    ...getTypography(
-      'bodyMedium',
-    ),
+    ...getTypography('bodyMedium'),
     color: colors.neutral[500],
   },
 
@@ -422,18 +310,13 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    ...getTypography(
-      'heading5',
-      'bold',
-    ),
+    ...getTypography('heading5', 'bold'),
     color: colors.neutral[900],
     textAlign: 'center',
   },
 
   description: {
-    ...getTypography(
-      'bodyMedium',
-    ),
+    ...getTypography('bodyMedium'),
     maxWidth: 310,
     marginTop: spacing[3],
     color: colors.neutral[500],
@@ -441,9 +324,7 @@ const styles = StyleSheet.create({
   },
 
   error: {
-    ...getTypography(
-      'bodySmall',
-    ),
+    ...getTypography('bodySmall'),
     marginTop: spacing[4],
     color: colors.error.base,
     textAlign: 'center',
@@ -460,10 +341,7 @@ const styles = StyleSheet.create({
   },
 
   laterText: {
-    ...getTypography(
-      'bodyMedium',
-      'semiBold',
-    ),
+    ...getTypography('bodyMedium', 'semiBold'),
     color: colors.neutral[500],
   },
 });
