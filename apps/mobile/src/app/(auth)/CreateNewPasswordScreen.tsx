@@ -33,7 +33,7 @@ export default function CreateNewPasswordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!resetPasswordVerified) {
-    return <Redirect href="/(auth)/forgot-password" />;
+    return <Redirect href="/(auth)/ForgotPasswordScreen" />;
   }
 
   const handleResetPassword = async () => {

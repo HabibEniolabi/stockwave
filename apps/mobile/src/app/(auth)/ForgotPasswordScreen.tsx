@@ -51,16 +51,6 @@ export default function ForgotPasswordScreen() {
     try {
       setIsSubmitting(true);
 
-      try {
-        const response = await fetch(
-          'https://xnboahtfjavimdlcnpyx.supabase.co/auth/v1/health',
-        );
-
-        console.log('SUPABASE HEALTH', response.status);
-      } catch (error) {
-        console.log('SUPABASE HEALTH FAILED', error);
-      }
-
       await startPasswordReset(normalizedEmail);
 
       router.push('/(auth)/ResetPasswordVerificationScreen');

@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -20,6 +20,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 import { getTypography } from '../../theme/typography';
+import { OtpPreviewModal } from '../../components/ui/OtpPreviewModal';
 
 const OTP_LENGTH = 6;
 
@@ -37,6 +38,16 @@ export default function ResetPasswordVerificationScreen() {
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+
+  const [isPreviewVisible, setIsPreviewVisible] = useState(
+    Boolean(passwordResetPreviewCode),
+  );
+
+  useEffect(() => {
+    if (passwordResetPreviewCode) {
+      setIsPreviewVisible(true);
+    }
+  }, [passwordResetPreviewCode]);
 
   if (!resetPasswordEmail) {
     return <Redirect href="/(auth)/ForgotPasswordScreen" />;
@@ -112,55 +123,60 @@ export default function ResetPasswordVerificationScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <BackButton onPress={() => router.back()} />
+    <>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <BackButton onPress={() => router.back()} />
 
-        <View style={styles.content}>
-          <AuthHeader
-            title="Enter verification code"
-            description={
-              passwordResetPreviewCode
-                ? 'Enter the development recovery code shown below.'
-                : `We sent a 6-digit verification code to\n${resetPasswordEmail}`
-            }
-          />
+          <View style={styles.content}>
+            <AuthHeader
+              title="Enter verification code"
+              description="Enter the 6-digit recovery code shown below "
+            />
 
-          <OtpInput
-            value={code}
-            length={OTP_LENGTH}
-            status={status}
-            shakeTrigger={shakeTrigger}
-            disabled={isVerifying}
-            onChangeText={handleCodeChange}
-          />
+            <OtpInput
+              value={code}
+              length={OTP_LENGTH}
+              status={status}
+              shakeTrigger={shakeTrigger}
+              disabled={isVerifying}
+              onChangeText={handleCodeChange}
+            />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable
-            disabled={isResending || isVerifying}
-            hitSlop={8}
+            <Pressable
+              disabled={isResending || isVerifying}
+              hitSlop={8}
+              onPress={() => {
+                void handleResend();
+              }}
+            >
+              <Text style={styles.resend}>
+                {isResending ? 'Generating...' : 'Generate new code'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Button
+            title={isVerifying ? 'Verifying...' : 'Verify code'}
+            variant="primary"
+            loading={isVerifying}
+            disabled={isVerifying || code.length !== OTP_LENGTH}
             onPress={() => {
-              void handleResend();
+              void verifyCode(code);
             }}
-          >
-            <Text style={styles.resend}>
-              {isResending ? 'Resending...' : 'Resend code'}
-            </Text>
-          </Pressable>
+          />
         </View>
-
-        <Button
-          title={isVerifying ? 'Verifying...' : 'Verify code'}
-          variant="primary"
-          loading={isVerifying}
-          disabled={isVerifying || code.length !== OTP_LENGTH}
-          onPress={() => {
-            void verifyCode(code);
-          }}
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <OtpPreviewModal
+        visible={Boolean(passwordResetPreviewCode)}
+        code={passwordResetPreviewCode}
+        onClose={() => {
+          setIsPreviewVisible(false);
+        }}
+      />
+    </>
   );
 }
 

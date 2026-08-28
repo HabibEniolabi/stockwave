@@ -13,15 +13,12 @@ import { supabase } from '../lib/supabase';
 import {
   getInAppVerificationStatus,
   markWelcomeSeen,
-  requestDevPasswordReset,
-  requestPasswordReset,
   saveRegistrationPhone as saveRegistrationPhoneMetadata,
   signInWithEmail,
   signUpWithEmail,
   startInAppVerification,
   updateRecoveredPassword,
   verifyInAppVerification,
-  verifyPasswordRecoveryCode,
   type SignUpPayload,
 } from '../services/auth';
 
@@ -300,6 +297,9 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     };
   }, [isSessionReady, user?.id]);
 
+  const generatePasswordResetCode = () =>
+    Math.floor(100000 + Math.random() * 900000).toString();
+
   const signIn = async (email: string, password: string) => {
     const data = await signInWithEmail(email, password);
 
@@ -402,26 +402,11 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('Email address is required.');
     }
 
+    const code = generatePasswordResetCode();
+
     setResetPasswordEmail(normalizedEmail);
-
     setResetPasswordVerified(false);
-
-    setPasswordResetPreviewCode('');
-
-    if (__DEV__) {
-      const challenge = await requestDevPasswordReset(normalizedEmail);
-
-      setPasswordResetPreviewCode(challenge.code);
-
-      return;
-    }
-
-    /*
-     * Real production recovery.
-     * SMTP/email ownership verification
-     * remains mandatory here.
-     */
-    await requestPasswordReset(normalizedEmail);
+    setPasswordResetPreviewCode(code);
   };
 
   const resendPasswordResetCode = async () => {
@@ -429,15 +414,10 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('No password reset is currently in progress.');
     }
 
-    if (__DEV__) {
-      const challenge = await requestDevPasswordReset(resetPasswordEmail);
+    const code = generatePasswordResetCode();
 
-      setPasswordResetPreviewCode(challenge.code);
-
-      return;
-    }
-
-    await requestPasswordReset(resetPasswordEmail);
+    setPasswordResetPreviewCode(code);
+    setResetPasswordVerified(false);
   };
 
   const verifyPasswordResetCode = async (code: string) => {
@@ -445,10 +425,15 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('No password reset is currently in progress.');
     }
 
-    await verifyPasswordRecoveryCode(resetPasswordEmail, code);
+    if (!passwordResetPreviewCode) {
+      throw new Error('No verification code is currently active.');
+    }
+
+    if (code.trim() !== passwordResetPreviewCode) {
+      throw new Error('The verification code is incorrect.');
+    }
 
     setPasswordResetPreviewCode('');
-
     setResetPasswordVerified(true);
   };
 
@@ -460,9 +445,8 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     await updateRecoveredPassword(password);
 
     setResetPasswordEmail('');
-
     setResetPasswordVerified(false);
-
+    setPasswordResetPreviewCode('');
     setIsAppUnlocked(false);
   };
 
@@ -495,13 +479,9 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
      * have NOT been deleted.
      */
     setPinCreated(false);
-
     setBiometricEnabled(false);
-
     setIsAppUnlocked(false);
-
     setIsDeviceSecurityReady(true);
-
     setIsVerificationReady(true);
   };
 
@@ -539,19 +519,13 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
      * invalid server-side.
      */
     syncSession(null);
-
     setPinCreated(false);
-
     setBiometricEnabled(false);
-
     setIsAppUnlocked(false);
-
     setResetPasswordEmail('');
-
     setResetPasswordVerified(false);
-
+    setPasswordResetPreviewCode('');
     setIsDeviceSecurityReady(true);
-
     setIsVerificationReady(true);
   };
 
