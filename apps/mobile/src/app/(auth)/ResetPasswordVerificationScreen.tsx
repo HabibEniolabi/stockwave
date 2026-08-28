@@ -30,6 +30,7 @@ export default function ResetPasswordVerificationScreen() {
     passwordResetPreviewCode,
     verifyPasswordResetCode,
     resendPasswordResetCode,
+    expirePasswordResetCode,
   } = useAppSession();
 
   const [code, setCode] = useState('');
@@ -99,7 +100,7 @@ export default function ResetPasswordVerificationScreen() {
   };
 
   const handleResend = async () => {
-    if (isResending) {
+    if (isResending || isVerifying) {
       return;
     }
 
@@ -111,15 +112,32 @@ export default function ResetPasswordVerificationScreen() {
       setStatus('default');
 
       await resendPasswordResetCode();
+
+      setIsPreviewVisible(true);
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
-          : 'Unable to resend verification code.',
+          : 'Unable to generate a new verification code.',
       );
     } finally {
       setIsResending(false);
     }
+  };
+
+  const handleClosePreview = () => {
+    setIsPreviewVisible(false);
+  };
+
+  const handlePreviewExpire = () => {
+    setIsPreviewVisible(false);
+
+    expirePasswordResetCode();
+
+    setCode('');
+    setStatus('default');
+
+    setError('The verification code has expired. Generate a new code.');
   };
 
   return (
@@ -170,11 +188,10 @@ export default function ResetPasswordVerificationScreen() {
         </View>
       </SafeAreaView>
       <OtpPreviewModal
-        visible={Boolean(passwordResetPreviewCode)}
+        visible={isPreviewVisible}
         code={passwordResetPreviewCode}
-        onClose={() => {
-          setIsPreviewVisible(false);
-        }}
+        onClose={handleClosePreview}
+        onExpire={handlePreviewExpire}
       />
     </>
   );

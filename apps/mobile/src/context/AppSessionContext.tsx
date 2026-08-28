@@ -67,8 +67,8 @@ type AppSessionContextValue = {
   isAppUnlocked: boolean;
 
   createPin: (pin: string) => Promise<void>;
-
   verifyPin: (pin: string) => Promise<boolean>;
+  expirePasswordResetCode: () => void;
 
   unlockApp: () => void;
   lockApp: () => void;
@@ -420,21 +420,38 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setResetPasswordVerified(false);
   };
 
-  const verifyPasswordResetCode = async (code: string) => {
+  const verifyPasswordResetCode =
+  async (
+    code: string,
+  ) => {
     if (!resetPasswordEmail) {
-      throw new Error('No password reset is currently in progress.');
+      throw new Error(
+        'No password reset is currently in progress.',
+      );
     }
 
     if (!passwordResetPreviewCode) {
-      throw new Error('No verification code is currently active.');
+      throw new Error(
+        'The verification code has expired. Generate a new code.',
+      );
     }
 
-    if (code.trim() !== passwordResetPreviewCode) {
-      throw new Error('The verification code is incorrect.');
+    if (
+      code.trim() !==
+      passwordResetPreviewCode
+    ) {
+      throw new Error(
+        'The verification code is incorrect.',
+      );
     }
 
-    setPasswordResetPreviewCode('');
-    setResetPasswordVerified(true);
+    setPasswordResetPreviewCode(
+      '',
+    );
+
+    setResetPasswordVerified(
+      true,
+    );
   };
 
   const completePasswordReset = async (password: string) => {
@@ -483,6 +500,17 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsAppUnlocked(false);
     setIsDeviceSecurityReady(true);
     setIsVerificationReady(true);
+  };
+
+  const expirePasswordResetCode =
+  () => {
+    setPasswordResetPreviewCode(
+      '',
+    );
+
+    setResetPasswordVerified(
+      false,
+    );
   };
 
   const resetSession = async () => {
@@ -571,6 +599,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         startPasswordReset,
         resendPasswordResetCode,
         verifyPasswordResetCode,
+        expirePasswordResetCode,
         completePasswordReset,
 
         signOutCurrentDevice,
