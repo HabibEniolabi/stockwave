@@ -185,17 +185,13 @@ const styles = StyleSheet.create({
 
   error: {
     ...getTypography('bodySmall'),
-
     color: colors.error.base,
-
     textAlign: 'center',
   },
 
   resend: {
     ...getTypography('bodyMedium', 'semiBold'),
-
     color: colors.primary[100],
-
     textAlign: 'center',
   },
 });
