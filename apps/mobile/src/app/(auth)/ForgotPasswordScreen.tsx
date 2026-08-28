@@ -1,132 +1,89 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 
-import {
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AuthHeader from
-  '../../components/common/AuthHeader';
+import AuthHeader from '../../components/common/AuthHeader';
 
-import {
-  TextField,
-} from '../../components/form/TextField';
+import { TextField } from '../../components/form/TextField';
 
-import {
-  BackButton,
-} from '../../components/ui/BackButton';
+import { BackButton } from '../../components/ui/BackButton';
 
-import {
-  Button,
-} from '../../components/ui/Button';
+import { Button } from '../../components/ui/Button';
 
-import {
-  useAppSession,
-} from '../../context/AppSessionContext';
+import { useAppSession } from '../../context/AppSessionContext';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 export default function ForgotPasswordScreen() {
-  const {
-    startPasswordReset,
-  } = useAppSession();
+  const { startPasswordReset } = useAppSession();
 
-  const [email, setEmail] =
-    useState('');
+  const [email, setEmail] = useState('');
 
-  const [
-    emailError,
-    setEmailError,
-  ] = useState('');
+  const [emailError, setEmailError] = useState('');
 
-  const [
-    isSubmitting,
-    setIsSubmitting,
-  ] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleContinue =
-    async () => {
-      if (isSubmitting) {
-        return;
-      }
+  const handleContinue = async () => {
+    if (isSubmitting) {
+      return;
+    }
 
-      const normalizedEmail =
-        email
-          .trim()
-          .toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
-      setEmailError('');
+    setEmailError('');
 
-      if (!normalizedEmail) {
-        setEmailError(
-          'Email address is required.',
-        );
+    if (!normalizedEmail) {
+      setEmailError('Email address is required.');
 
-        return;
-      }
+      return;
+    }
 
-      if (
-        !/^\S+@\S+\.\S+$/.test(
-          normalizedEmail,
-        )
-      ) {
-        setEmailError(
-          'Enter a valid email address.',
-        );
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setEmailError('Enter a valid email address.');
 
-        return;
-      }
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
 
       try {
-        setIsSubmitting(true);
-
-        await startPasswordReset(
-          normalizedEmail,
+        const response = await fetch(
+          'https://xnboahtfjavimdlcnpyx.supabase.co/auth/v1/health',
         );
 
-        router.push(
-          '/(auth)/ResetPasswordVerificationScreen',
-        );
+        console.log('SUPABASE HEALTH', response.status);
       } catch (error) {
-        setEmailError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to start password recovery.',
-        );
-      } finally {
-        setIsSubmitting(false);
+        console.log('SUPABASE HEALTH FAILED', error);
       }
-    };
+
+      await startPasswordReset(normalizedEmail);
+
+      router.push('/(auth)/ResetPasswordVerificationScreen');
+    } catch (error) {
+      setEmailError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to start password recovery.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <SafeAreaView
-      style={styles.safeArea}
-    >
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : undefined
-        }
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <BackButton
-          onPress={() =>
-            router.back()
-          }
-        />
+        <BackButton onPress={() => router.back()} />
 
-        <View
-          style={styles.content}
-        >
+        <View style={styles.content}>
           <AuthHeader
             title="Forgot password?"
             description="Enter your email address and we'll send you a verification code."
@@ -145,7 +102,7 @@ export default function ForgotPasswordScreen() {
             onSubmitEditing={() => {
               void handleContinue();
             }}
-            onChangeText={value => {
+            onChangeText={(value) => {
               setEmail(value);
 
               if (emailError) {
@@ -169,28 +126,22 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const styles =
-  StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor:
-        colors.other.white,
-    },
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.other.white,
+  },
 
-    container: {
-      flex: 1,
-      paddingHorizontal:
-        spacing[4],
-      paddingTop:
-        spacing[2],
-      paddingBottom:
-        spacing[4],
-    },
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[4],
+  },
 
-    content: {
-      flex: 1,
-      gap: spacing[8],
-      marginTop:
-        spacing[12],
-    },
-  });
+  content: {
+    flex: 1,
+    gap: spacing[8],
+    marginTop: spacing[12],
+  },
+});

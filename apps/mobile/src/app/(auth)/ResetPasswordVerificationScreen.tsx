@@ -26,25 +26,20 @@ const OTP_LENGTH = 6;
 export default function ResetPasswordVerificationScreen() {
   const {
     resetPasswordEmail,
-
+    passwordResetPreviewCode,
     verifyPasswordResetCode,
     resendPasswordResetCode,
   } = useAppSession();
 
   const [code, setCode] = useState('');
-
   const [status, setStatus] = useState<OtpStatus>('default');
-
   const [shakeTrigger, setShakeTrigger] = useState(0);
-
   const [error, setError] = useState('');
-
   const [isVerifying, setIsVerifying] = useState(false);
-
   const [isResending, setIsResending] = useState(false);
 
   if (!resetPasswordEmail) {
-    return <Redirect href="/(auth)/forgot-password" />;
+    return <Redirect href="/(auth)/ForgotPasswordScreen" />;
   }
 
   const verifyCode = async (value: string) => {
@@ -124,7 +119,11 @@ export default function ResetPasswordVerificationScreen() {
         <View style={styles.content}>
           <AuthHeader
             title="Enter verification code"
-            description={`We sent a 6-digit verification code to\n${resetPasswordEmail}`}
+            description={
+              passwordResetPreviewCode
+                ? 'Enter the development recovery code shown below.'
+                : `We sent a 6-digit verification code to\n${resetPasswordEmail}`
+            }
           />
 
           <OtpInput
@@ -139,7 +138,7 @@ export default function ResetPasswordVerificationScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            disabled={isResending}
+            disabled={isResending || isVerifying}
             hitSlop={8}
             onPress={() => {
               void handleResend();
@@ -155,7 +154,7 @@ export default function ResetPasswordVerificationScreen() {
           title={isVerifying ? 'Verifying...' : 'Verify code'}
           variant="primary"
           loading={isVerifying}
-          disabled={code.length !== OTP_LENGTH}
+          disabled={isVerifying || code.length !== OTP_LENGTH}
           onPress={() => {
             void verifyCode(code);
           }}

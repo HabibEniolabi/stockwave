@@ -6,16 +6,14 @@ import {
   type ReactNode,
 } from 'react';
 
-import type {
-  Session,
-  User,
-} from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
 
 import {
   getInAppVerificationStatus,
   markWelcomeSeen,
+  requestDevPasswordReset,
   requestPasswordReset,
   saveRegistrationPhone as saveRegistrationPhoneMetadata,
   signInWithEmail,
@@ -54,26 +52,15 @@ type AppSessionContextValue = {
   hasCompletedVerification: boolean;
   isVerificationReady: boolean;
 
-  signIn: (
-    email: string,
-    password: string,
-  ) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
 
-  signUp: (
-    payload: SignUpPayload,
-  ) => Promise<void>;
+  signUp: (payload: SignUpPayload) => Promise<void>;
 
-  saveRegistrationPhone: (
-    phone: string,
-    countryCode: string,
-  ) => Promise<void>;
+  saveRegistrationPhone: (phone: string, countryCode: string) => Promise<void>;
 
-  startVerification:
-    () => Promise<VerificationChallenge>;
+  startVerification: () => Promise<VerificationChallenge>;
 
-  verifyVerificationCode: (
-    code: string,
-  ) => Promise<void>;
+  verifyVerificationCode: (code: string) => Promise<void>;
 
   completeWelcome: () => Promise<void>;
 
@@ -82,13 +69,9 @@ type AppSessionContextValue = {
   pinCreated: boolean;
   isAppUnlocked: boolean;
 
-  createPin: (
-    pin: string,
-  ) => Promise<void>;
+  createPin: (pin: string) => Promise<void>;
 
-  verifyPin: (
-    pin: string,
-  ) => Promise<boolean>;
+  verifyPin: (pin: string) => Promise<boolean>;
 
   unlockApp: () => void;
   lockApp: () => void;
@@ -97,111 +80,65 @@ type AppSessionContextValue = {
 
   resetPasswordEmail: string;
   resetPasswordVerified: boolean;
+  passwordResetPreviewCode: string;
 
-  startPasswordReset: (
-    email: string,
-  ) => Promise<void>;
+  startPasswordReset: (email: string) => Promise<void>;
 
-  resendPasswordResetCode:
-    () => Promise<void>;
+  resendPasswordResetCode: () => Promise<void>;
 
-  verifyPasswordResetCode: (
-    code: string,
-  ) => Promise<void>;
+  verifyPasswordResetCode: (code: string) => Promise<void>;
 
-  completePasswordReset: (
-    password: string,
-  ) => Promise<void>;
+  completePasswordReset: (password: string) => Promise<void>;
 
   signOutCurrentDevice: () => Promise<void>;
 
   resetSession: () => Promise<void>;
 };
 
-const AppSessionContext =
-  createContext<
-    AppSessionContextValue | undefined
-  >(undefined);
+const AppSessionContext = createContext<AppSessionContextValue | undefined>(
+  undefined,
+);
 
 type AppSessionProviderProps = {
   children: ReactNode;
 };
 
-export function AppSessionProvider({
-  children,
-}: AppSessionProviderProps) {
-  const [session, setSession] =
-    useState<Session | null>(null);
+export function AppSessionProvider({ children }: AppSessionProviderProps) {
+  const [session, setSession] = useState<Session | null>(null);
 
-  const [
-    isSessionReady,
-    setIsSessionReady,
-  ] = useState(false);
+  const [isSessionReady, setIsSessionReady] = useState(false);
 
-  const [
-    hasSeenWelcome,
-    setHasSeenWelcome,
-  ] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
-  const [
-    hasCompletedVerification,
-    setHasCompletedVerification,
-  ] = useState(false);
+  const [hasCompletedVerification, setHasCompletedVerification] =
+    useState(false);
 
-  const [
-    isVerificationReady,
-    setIsVerificationReady,
-  ] = useState(false);
+  const [isVerificationReady, setIsVerificationReady] = useState(false);
 
-  const [
-    isDeviceSecurityReady,
-    setIsDeviceSecurityReady,
-  ] = useState(false);
+  const [isDeviceSecurityReady, setIsDeviceSecurityReady] = useState(false);
 
-  const [
-    biometricEnabled,
-    setBiometricEnabled,
-  ] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  const [
-    pinCreated,
-    setPinCreated,
-  ] = useState(false);
+  const [pinCreated, setPinCreated] = useState(false);
 
-  const [
-    isAppUnlocked,
-    setIsAppUnlocked,
-  ] = useState(false);
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false);
 
-  const [
-    resetPasswordEmail,
-    setResetPasswordEmail,
-  ] = useState('');
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('');
 
-  const [
-    resetPasswordVerified,
-    setResetPasswordVerified,
-  ] = useState(false);
+  const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
 
-  const user =
-    session?.user ?? null;
+  const [passwordResetPreviewCode, setPasswordResetPreviewCode] = useState('');
 
-  const isAuthenticated =
-    Boolean(session);
+  const user = session?.user ?? null;
 
-  const hasRegistrationPhone =
-    Boolean(
-      user?.user_metadata
-        ?.registration_phone,
-    );
+  const isAuthenticated = Boolean(session);
 
-  const syncSession = (
-    nextSession: Session | null,
-  ) => {
+  const hasRegistrationPhone = Boolean(user?.user_metadata?.registration_phone);
+
+  const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
 
-    const nextUser =
-      nextSession?.user ?? null;
+    const nextUser = nextSession?.user ?? null;
 
     if (!nextUser) {
       setHasSeenWelcome(false);
@@ -210,54 +147,41 @@ export function AppSessionProvider({
       return;
     }
 
-    setHasSeenWelcome(
-      Boolean(
-        nextUser.user_metadata
-          ?.has_seen_welcome,
-      ),
-    );
+    setHasSeenWelcome(Boolean(nextUser.user_metadata?.has_seen_welcome));
   };
 
   useEffect(() => {
     let mounted = true;
 
-    const restoreSession =
-      async () => {
-        const { data, error } =
-          await supabase.auth.getSession();
+    const restoreSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        if (error) {
-          console.error(
-            'Unable to restore Supabase session:',
-            error.message,
-          );
-        }
+      if (error) {
+        console.error('Unable to restore Supabase session:', error.message);
+      }
 
-        syncSession(data.session);
+      syncSession(data.session);
 
-        setIsAppUnlocked(false);
-        setIsSessionReady(true);
-      };
+      setIsAppUnlocked(false);
+      setIsSessionReady(true);
+    };
 
     void restoreSession();
 
     const {
       data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, nextSession) => {
-          if (!mounted) {
-            return;
-          }
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) {
+        return;
+      }
 
-          syncSession(nextSession);
-          setIsSessionReady(true);
-        },
-      );
+      syncSession(nextSession);
+      setIsSessionReady(true);
+    });
 
     return () => {
       mounted = false;
@@ -269,167 +193,123 @@ export function AppSessionProvider({
   useEffect(() => {
     let active = true;
 
-    const restoreVerificationState =
-      async () => {
-        if (!isSessionReady) {
+    const restoreVerificationState = async () => {
+      if (!isSessionReady) {
+        return;
+      }
+
+      setIsVerificationReady(false);
+
+      if (!user) {
+        if (!active) {
           return;
         }
 
-        setIsVerificationReady(false);
+        setHasCompletedVerification(false);
 
-        if (!user) {
-          if (!active) {
-            return;
-          }
+        setIsVerificationReady(true);
 
-          setHasCompletedVerification(
-            false,
-          );
+        return;
+      }
 
+      try {
+        const verified = await getInAppVerificationStatus(user.id);
+
+        if (!active) {
+          return;
+        }
+
+        setHasCompletedVerification(verified);
+      } catch (error) {
+        console.error('Unable to restore verification state:', error);
+
+        if (active) {
+          setHasCompletedVerification(false);
+        }
+      } finally {
+        if (active) {
           setIsVerificationReady(true);
-
-          return;
         }
-
-        try {
-          const verified =
-            await getInAppVerificationStatus(
-              user.id,
-            );
-
-          if (!active) {
-            return;
-          }
-
-          setHasCompletedVerification(
-            verified,
-          );
-        } catch (error) {
-          console.error(
-            'Unable to restore verification state:',
-            error,
-          );
-
-          if (active) {
-            setHasCompletedVerification(
-              false,
-            );
-          }
-        } finally {
-          if (active) {
-            setIsVerificationReady(true);
-          }
-        }
-      };
+      }
+    };
 
     void restoreVerificationState();
 
     return () => {
       active = false;
     };
-  }, [
-    isSessionReady,
-    user?.id,
-  ]);
+  }, [isSessionReady, user?.id]);
 
   useEffect(() => {
     let active = true;
 
-    const restoreDeviceSecurity =
-      async () => {
-        if (!isSessionReady) {
+    const restoreDeviceSecurity = async () => {
+      if (!isSessionReady) {
+        return;
+      }
+
+      setIsDeviceSecurityReady(false);
+
+      if (!user) {
+        if (!active) {
           return;
         }
 
-        setIsDeviceSecurityReady(false);
+        setPinCreated(false);
+        setBiometricEnabled(false);
+        setIsAppUnlocked(false);
 
-        if (!user) {
-          if (!active) {
-            return;
-          }
+        setIsDeviceSecurityReady(true);
 
-          setPinCreated(false);
-          setBiometricEnabled(false);
-          setIsAppUnlocked(false);
+        return;
+      }
 
-          setIsDeviceSecurityReady(
-            true,
-          );
+      try {
+        const [hasPin, biometricsEnabled] = await Promise.all([
+          hasDevicePin(user.id),
+          getDeviceBiometricsEnabled(user.id),
+        ]);
 
+        if (!active) {
           return;
         }
 
-        try {
-          const [
-            hasPin,
-            biometricsEnabled,
-          ] = await Promise.all([
-            hasDevicePin(user.id),
-            getDeviceBiometricsEnabled(
-              user.id,
-            ),
-          ]);
+        setPinCreated(hasPin);
 
-          if (!active) {
-            return;
-          }
+        setBiometricEnabled(biometricsEnabled);
+      } catch (error) {
+        console.error('Unable to restore device security:', error);
 
-          setPinCreated(hasPin);
-
-          setBiometricEnabled(
-            biometricsEnabled,
-          );
-        } catch (error) {
-          console.error(
-            'Unable to restore device security:',
-            error,
-          );
-
-          if (!active) {
-            return;
-          }
-
-          setPinCreated(false);
-          setBiometricEnabled(false);
-        } finally {
-          if (active) {
-            setIsDeviceSecurityReady(
-              true,
-            );
-          }
+        if (!active) {
+          return;
         }
-      };
+
+        setPinCreated(false);
+        setBiometricEnabled(false);
+      } finally {
+        if (active) {
+          setIsDeviceSecurityReady(true);
+        }
+      }
+    };
 
     void restoreDeviceSecurity();
 
     return () => {
       active = false;
     };
-  }, [
-    isSessionReady,
-    user?.id,
-  ]);
+  }, [isSessionReady, user?.id]);
 
-  const signIn = async (
-    email: string,
-    password: string,
-  ) => {
-    const data =
-      await signInWithEmail(
-        email,
-        password,
-      );
+  const signIn = async (email: string, password: string) => {
+    const data = await signInWithEmail(email, password);
 
     syncSession(data.session);
 
     setIsAppUnlocked(true);
   };
 
-  const signUp = async (
-    payload: SignUpPayload,
-  ) => {
-    const data =
-      await signUpWithEmail(payload);
+  const signUp = async (payload: SignUpPayload) => {
+    const data = await signUpWithEmail(payload);
 
     syncSession(data.session);
 
@@ -437,101 +317,62 @@ export function AppSessionProvider({
     setIsAppUnlocked(true);
   };
 
-  const saveRegistrationPhone =
-    async (
-      phone: string,
-      countryCode: string,
-    ) => {
-      const data =
-        await saveRegistrationPhoneMetadata(
-          phone,
-          countryCode,
-        );
+  const saveRegistrationPhone = async (phone: string, countryCode: string) => {
+    const data = await saveRegistrationPhoneMetadata(phone, countryCode);
 
-      const currentSession =
-        session;
+    const currentSession = session;
 
-      if (
-        currentSession &&
-        data.user
-      ) {
-        syncSession({
-          ...currentSession,
-          user: data.user,
-        });
+    if (currentSession && data.user) {
+      syncSession({
+        ...currentSession,
+        user: data.user,
+      });
 
-        return;
-      }
-
-      const {
-        data: sessionData,
-        error,
-      } =
-        await supabase.auth.getSession();
-
-      if (error) {
-        throw error;
-      }
-
-      syncSession(
-        sessionData.session,
-      );
-    };
-
-  const startVerification =
-    async () => {
-      return startInAppVerification();
-    };
-
-  const verifyVerificationCode =
-    async (
-      code: string,
-    ) => {
-      await verifyInAppVerification(
-        code,
-      );
-
-      setHasCompletedVerification(
-        true,
-      );
-    };
-
-  const completeWelcome =
-    async () => {
-      await markWelcomeSeen();
-
-      setHasSeenWelcome(true);
-    };
-
-  const createPin = async (
-    pin: string,
-  ) => {
-    if (!user) {
-      throw new Error(
-        'An authenticated user is required to create a PIN.',
-      );
+      return;
     }
 
-    await saveDevicePin(
-      user.id,
-      pin,
-    );
+    const { data: sessionData, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw error;
+    }
+
+    syncSession(sessionData.session);
+  };
+
+  const startVerification = async () => {
+    return startInAppVerification();
+  };
+
+  const verifyVerificationCode = async (code: string) => {
+    await verifyInAppVerification(code);
+
+    setHasCompletedVerification(true);
+  };
+
+  const completeWelcome = async () => {
+    await markWelcomeSeen();
+
+    setHasSeenWelcome(true);
+  };
+
+  const createPin = async (pin: string) => {
+    if (!user) {
+      throw new Error('An authenticated user is required to create a PIN.');
+    }
+
+    await saveDevicePin(user.id, pin);
 
     setPinCreated(true);
     setIsAppUnlocked(true);
   };
 
-  const verifyPin = async (
-    pin: string,
-  ) => {
+  const verifyPin = async (pin: string) => {
     if (!user) {
       return false;
     }
 
-    return verifyDevicePin(
-      user.id,
-      pin,
-    );
+    return verifyDevicePin(user.id, pin);
   };
 
   const unlockApp = () => {
@@ -542,113 +383,93 @@ export function AppSessionProvider({
     setIsAppUnlocked(false);
   };
 
-  const enableBiometrics =
-    async () => {
-      if (!user) {
-        throw new Error(
-          'An authenticated user is required to enable biometrics.',
-        );
-      }
-
-      await setDeviceBiometricsEnabled(
-        user.id,
-        true,
+  const enableBiometrics = async () => {
+    if (!user) {
+      throw new Error(
+        'An authenticated user is required to enable biometrics.',
       );
+    }
 
-      setBiometricEnabled(true);
-    };
+    await setDeviceBiometricsEnabled(user.id, true);
 
-  const startPasswordReset =
-    async (
-      email: string,
-    ) => {
-      const normalizedEmail =
-        email
-          .trim()
-          .toLowerCase();
+    setBiometricEnabled(true);
+  };
 
-      if (!normalizedEmail) {
-        throw new Error(
-          'Email address is required.',
-        );
-      }
+  const startPasswordReset = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
 
-      await requestPasswordReset(
-        normalizedEmail,
-      );
+    if (!normalizedEmail) {
+      throw new Error('Email address is required.');
+    }
 
-      setResetPasswordEmail(
-        normalizedEmail,
-      );
+    setResetPasswordEmail(normalizedEmail);
 
-      setResetPasswordVerified(
-        false,
-      );
-    };
+    setResetPasswordVerified(false);
 
-  const resendPasswordResetCode =
-    async () => {
-      if (!resetPasswordEmail) {
-        throw new Error(
-          'No password reset is currently in progress.',
-        );
-      }
+    setPasswordResetPreviewCode('');
 
-      await requestPasswordReset(
-        resetPasswordEmail,
-      );
-    };
+    if (__DEV__) {
+      const challenge = await requestDevPasswordReset(normalizedEmail);
 
-  const verifyPasswordResetCode =
-    async (
-      code: string,
-    ) => {
-      if (!resetPasswordEmail) {
-        throw new Error(
-          'No password reset is currently in progress.',
-        );
-      }
+      setPasswordResetPreviewCode(challenge.code);
 
-      await verifyPasswordRecoveryCode(
-        resetPasswordEmail,
-        code,
-      );
+      return;
+    }
 
-      setResetPasswordVerified(true);
-    };
+    /*
+     * Real production recovery.
+     * SMTP/email ownership verification
+     * remains mandatory here.
+     */
+    await requestPasswordReset(normalizedEmail);
+  };
 
-  const completePasswordReset =
-    async (
-      password: string,
-    ) => {
-      if (!resetPasswordVerified) {
-        throw new Error(
-          'Password recovery has not been verified.',
-        );
-      }
+  const resendPasswordResetCode = async () => {
+    if (!resetPasswordEmail) {
+      throw new Error('No password reset is currently in progress.');
+    }
 
-      await updateRecoveredPassword(
-        password,
-      );
+    if (__DEV__) {
+      const challenge = await requestDevPasswordReset(resetPasswordEmail);
 
-      setResetPasswordEmail('');
+      setPasswordResetPreviewCode(challenge.code);
 
-      setResetPasswordVerified(
-        false,
-      );
+      return;
+    }
 
-      setIsAppUnlocked(false);
-    };
+    await requestPasswordReset(resetPasswordEmail);
+  };
 
-  const signOutCurrentDevice =
-  async () => {
-    const {
-      error,
-    } =
-      await supabase.auth
-        .signOut({
-          scope: 'local',
-        });
+  const verifyPasswordResetCode = async (code: string) => {
+    if (!resetPasswordEmail) {
+      throw new Error('No password reset is currently in progress.');
+    }
+
+    await verifyPasswordRecoveryCode(resetPasswordEmail, code);
+
+    setPasswordResetPreviewCode('');
+
+    setResetPasswordVerified(true);
+  };
+
+  const completePasswordReset = async (password: string) => {
+    if (!resetPasswordVerified) {
+      throw new Error('Password recovery has not been verified.');
+    }
+
+    await updateRecoveredPassword(password);
+
+    setResetPasswordEmail('');
+
+    setResetPasswordVerified(false);
+
+    setIsAppUnlocked(false);
+  };
+
+  const signOutCurrentDevice = async () => {
+    const { error } = await supabase.auth.signOut({
+      scope: 'local',
+    });
 
     if (error) {
       throw error;
@@ -675,25 +496,17 @@ export function AppSessionProvider({
      */
     setPinCreated(false);
 
-    setBiometricEnabled(
-      false,
-    );
+    setBiometricEnabled(false);
 
     setIsAppUnlocked(false);
 
-    setIsDeviceSecurityReady(
-      true,
-    );
+    setIsDeviceSecurityReady(true);
 
-    setIsVerificationReady(
-      true,
-    );
+    setIsVerificationReady(true);
   };
 
-  const resetSession =
-  async () => {
-    const userId =
-      user?.id;
+  const resetSession = async () => {
+    const userId = user?.id;
 
     /*
      * This IS destructive cleanup.
@@ -702,9 +515,7 @@ export function AppSessionProvider({
      * a genuine full local reset.
      */
     if (userId) {
-      await clearDeviceSecurity(
-        userId,
-      );
+      await clearDeviceSecurity(userId);
     }
 
     /*
@@ -714,19 +525,12 @@ export function AppSessionProvider({
      * We still need to ensure the client
      * removes its local Supabase session.
      */
-    const {
-      error,
-    } =
-      await supabase.auth
-        .signOut({
-          scope: 'local',
-        });
+    const { error } = await supabase.auth.signOut({
+      scope: 'local',
+    });
 
     if (error) {
-      console.warn(
-        'Unable to complete remote sign out during reset:',
-        error,
-      );
+      console.warn('Unable to complete remote sign out during reset:', error);
     }
 
     /*
@@ -738,25 +542,17 @@ export function AppSessionProvider({
 
     setPinCreated(false);
 
-    setBiometricEnabled(
-      false,
-    );
+    setBiometricEnabled(false);
 
     setIsAppUnlocked(false);
 
     setResetPasswordEmail('');
 
-    setResetPasswordVerified(
-      false,
-    );
+    setResetPasswordVerified(false);
 
-    setIsDeviceSecurityReady(
-      true,
-    );
+    setIsDeviceSecurityReady(true);
 
-    setIsVerificationReady(
-      true,
-    );
+    setIsVerificationReady(true);
   };
 
   return (
@@ -796,6 +592,7 @@ export function AppSessionProvider({
 
         resetPasswordEmail,
         resetPasswordVerified,
+        passwordResetPreviewCode,
 
         startPasswordReset,
         resendPasswordResetCode,
@@ -812,13 +609,10 @@ export function AppSessionProvider({
 }
 
 export function useAppSession() {
-  const context =
-    useContext(AppSessionContext);
+  const context = useContext(AppSessionContext);
 
   if (!context) {
-    throw new Error(
-      'useAppSession must be used inside AppSessionProvider',
-    );
+    throw new Error('useAppSession must be used inside AppSessionProvider');
   }
 
   return context;

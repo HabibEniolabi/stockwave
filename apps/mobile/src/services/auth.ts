@@ -65,12 +65,35 @@ export async function signInWithEmail(email: string, password: string) {
 //   }
 // }
 
+// export async function requestPasswordReset(email: string) {
+//   const normalizedEmail = email.trim().toLowerCase();
+
+//   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+
+//   if (error) {
+//     throw error;
+//   }
+// }
+
 export async function requestPasswordReset(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+  console.log('PASSWORD RESET: starting', normalizedEmail);
 
-  if (error) {
+  try {
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(normalizedEmail);
+
+    console.log('PASSWORD RESET: Supabase responded', {
+      error,
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('PASSWORD RESET REQUEST FAILED:', error);
+
     throw error;
   }
 }
@@ -225,23 +248,14 @@ export async function signOut() {
 //   return data;
 // }
 
-export async function completePhoneSignUpProfile(
-  username: string,
-) {
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth
-      .updateUser({
-        data: {
-          username:
-            username.trim(),
+export async function completePhoneSignUpProfile(username: string) {
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      username: username.trim(),
 
-          has_seen_welcome:
-            false,
-        },
-      });
+      has_seen_welcome: false,
+    },
+  });
 
   if (error) {
     throw error;
@@ -250,29 +264,22 @@ export async function completePhoneSignUpProfile(
   return data;
 }
 
-
 export type InAppVerificationChallenge = {
   code: string;
   expiresAt: string;
 };
 
 export async function startInAppVerification(): Promise<InAppVerificationChallenge> {
-  const { data, error } = await supabase.rpc(
-    'start_in_app_verification',
-  );
+  const { data, error } = await supabase.rpc('start_in_app_verification');
 
   if (error) {
     throw error;
   }
 
-  const challenge = Array.isArray(data)
-    ? data[0]
-    : data;
+  const challenge = Array.isArray(data) ? data[0] : data;
 
   if (!challenge?.code || !challenge?.expires_at) {
-    throw new Error(
-      'Unable to create verification challenge.',
-    );
+    throw new Error('Unable to create verification challenge.');
   }
 
   return {
@@ -281,30 +288,21 @@ export async function startInAppVerification(): Promise<InAppVerificationChallen
   };
 }
 
-export async function verifyInAppVerification(
-  code: string,
-) {
-  const { data, error } = await supabase.rpc(
-    'verify_in_app_verification',
-    {
-      p_code: code.trim(),
-    },
-  );
+export async function verifyInAppVerification(code: string) {
+  const { data, error } = await supabase.rpc('verify_in_app_verification', {
+    p_code: code.trim(),
+  });
 
   if (error) {
     throw error;
   }
 
   if (data !== true) {
-    throw new Error(
-      'The verification code is invalid or has expired.',
-    );
+    throw new Error('The verification code is invalid or has expired.');
   }
 }
 
-export async function getInAppVerificationStatus(
-  userId: string,
-) {
+export async function getInAppVerificationStatus(userId: string) {
   const { data, error } = await supabase
     .from('user_verification_state')
     .select('verification_completed_at')
@@ -334,4 +332,35 @@ export async function saveRegistrationPhone(
   }
 
   return data;
+}
+
+export type DevPasswordResetChallenge = {
+  code: string;
+};
+
+export async function requestDevPasswordReset(
+  email: string,
+): Promise<DevPasswordResetChallenge> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { data, error } = await supabase.functions.invoke(
+    'dev-password-recovery',
+    {
+      body: {
+        email: normalizedEmail,
+      },
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.code) {
+    throw new Error('Unable to generate development recovery code.');
+  }
+
+  return {
+    code: String(data.code),
+  };
 }
