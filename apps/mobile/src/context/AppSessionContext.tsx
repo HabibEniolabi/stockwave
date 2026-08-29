@@ -69,7 +69,7 @@ type AppSessionContextValue = {
   createPin: (pin: string) => Promise<void>;
   verifyPin: (pin: string) => Promise<boolean>;
   expirePasswordResetCode: () => void;
-
+  passwordResetCodeExpiresAt: number | null;
   unlockApp: () => void;
   lockApp: () => void;
 
@@ -109,28 +109,25 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
   const [hasCompletedVerification, setHasCompletedVerification] =
     useState(false);
-
   const [isVerificationReady, setIsVerificationReady] = useState(false);
-
   const [isDeviceSecurityReady, setIsDeviceSecurityReady] = useState(false);
-
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-
   const [pinCreated, setPinCreated] = useState(false);
-
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
-
   const [resetPasswordEmail, setResetPasswordEmail] = useState('');
-
   const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
-
   const [passwordResetPreviewCode, setPasswordResetPreviewCode] = useState('');
+  const [passwordResetCodeExpiresAt, setPasswordResetCodeExpiresAt] = useState<
+    number | null
+  >(null);
 
   const user = session?.user ?? null;
 
   const isAuthenticated = Boolean(session);
 
   const hasRegistrationPhone = Boolean(user?.user_metadata?.registration_phone);
+
+  const PASSWORD_RESET_CODE_DURATION = 5 * 60 * 1000;
 
   const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
@@ -403,10 +400,12 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     }
 
     const code = generatePasswordResetCode();
+    const expiresAt = Date.now() + PASSWORD_RESET_CODE_DURATION;
 
     setResetPasswordEmail(normalizedEmail);
     setResetPasswordVerified(false);
     setPasswordResetPreviewCode(code);
+    setPasswordResetCodeExpiresAt(expiresAt);
   };
 
   const resendPasswordResetCode = async () => {
@@ -415,43 +414,43 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     }
 
     const code = generatePasswordResetCode();
+    const expiresAt = Date.now() + PASSWORD_RESET_CODE_DURATION;
 
     setPasswordResetPreviewCode(code);
+    setPasswordResetCodeExpiresAt(expiresAt);
     setResetPasswordVerified(false);
   };
 
-  const verifyPasswordResetCode =
-  async (
-    code: string,
-  ) => {
+  const verifyPasswordResetCode = async (code: string) => {
     if (!resetPasswordEmail) {
-      throw new Error(
-        'No password reset is currently in progress.',
-      );
+      throw new Error('No password reset is currently in progress.');
     }
 
-    if (!passwordResetPreviewCode) {
+    if (!passwordResetPreviewCode || !passwordResetCodeExpiresAt) {
+      throw new Error('No verification code is currently active.');
+    }
+
+    if (Date.now() >= passwordResetCodeExpiresAt) {
+      setPasswordResetPreviewCode('');
+
+      setPasswordResetCodeExpiresAt(null);
+
+      setResetPasswordVerified(false);
+
       throw new Error(
         'The verification code has expired. Generate a new code.',
       );
     }
 
-    if (
-      code.trim() !==
-      passwordResetPreviewCode
-    ) {
-      throw new Error(
-        'The verification code is incorrect.',
-      );
+    if (code.trim() !== passwordResetPreviewCode) {
+      throw new Error('The verification code is incorrect.');
     }
 
-    setPasswordResetPreviewCode(
-      '',
-    );
+    setPasswordResetPreviewCode('');
 
-    setResetPasswordVerified(
-      true,
-    );
+    setPasswordResetCodeExpiresAt(null);
+
+    setResetPasswordVerified(true);
   };
 
   const completePasswordReset = async (password: string) => {
@@ -463,6 +462,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
     setResetPasswordEmail('');
     setResetPasswordVerified(false);
+    setPasswordResetCodeExpiresAt(null);
     setPasswordResetPreviewCode('');
     setIsAppUnlocked(false);
   };
@@ -502,15 +502,10 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsVerificationReady(true);
   };
 
-  const expirePasswordResetCode =
-  () => {
-    setPasswordResetPreviewCode(
-      '',
-    );
+  const expirePasswordResetCode = () => {
+    setPasswordResetPreviewCode('');
 
-    setResetPasswordVerified(
-      false,
-    );
+    setResetPasswordVerified(false);
   };
 
   const resetSession = async () => {
@@ -554,6 +549,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setResetPasswordVerified(false);
     setPasswordResetPreviewCode('');
     setIsDeviceSecurityReady(true);
+    setPasswordResetCodeExpiresAt(null);
     setIsVerificationReady(true);
   };
 
@@ -601,6 +597,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         verifyPasswordResetCode,
         expirePasswordResetCode,
         completePasswordReset,
+        passwordResetCodeExpiresAt,
 
         signOutCurrentDevice,
         resetSession,

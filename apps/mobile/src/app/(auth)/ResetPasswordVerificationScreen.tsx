@@ -30,7 +30,7 @@ export default function ResetPasswordVerificationScreen() {
     passwordResetPreviewCode,
     verifyPasswordResetCode,
     resendPasswordResetCode,
-    expirePasswordResetCode,
+    passwordResetCodeExpiresAt,
   } = useAppSession();
 
   const [code, setCode] = useState('');
@@ -39,6 +39,7 @@ export default function ResetPasswordVerificationScreen() {
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
   const [isPreviewVisible, setIsPreviewVisible] = useState(
     Boolean(passwordResetPreviewCode),
@@ -50,12 +51,41 @@ export default function ResetPasswordVerificationScreen() {
     }
   }, [passwordResetPreviewCode]);
 
+  useEffect(() => {
+    if (!passwordResetCodeExpiresAt) {
+      return;
+    }
+
+    setNow(Date.now());
+
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [passwordResetCodeExpiresAt]);
+
+  const remainingSeconds = passwordResetCodeExpiresAt
+    ? Math.max(0, Math.ceil((passwordResetCodeExpiresAt - now) / 1000))
+    : 0;
+
+  const isCodeExpired =
+    Boolean(passwordResetCodeExpiresAt) && remainingSeconds === 0;
+
+  const minutes = Math.floor(remainingSeconds / 60);
+
+  const seconds = remainingSeconds % 60;
+
+  const formattedExpiry = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
   if (!resetPasswordEmail) {
     return <Redirect href="/(auth)/ForgotPasswordScreen" />;
   }
 
   const verifyCode = async (value: string) => {
-    if (isVerifying || value.length !== OTP_LENGTH) {
+    if (isVerifying || isCodeExpired || value.length !== OTP_LENGTH) {
       return;
     }
 
@@ -94,7 +124,7 @@ export default function ResetPasswordVerificationScreen() {
     setStatus('default');
     setError('');
 
-    if (value.length === OTP_LENGTH) {
+    if (value.length === OTP_LENGTH && !isCodeExpired) {
       void verifyCode(value);
     }
   };
@@ -113,6 +143,8 @@ export default function ResetPasswordVerificationScreen() {
 
       await resendPasswordResetCode();
 
+      setNow(Date.now());
+
       setIsPreviewVisible(true);
     } catch (error) {
       setError(
@@ -127,17 +159,6 @@ export default function ResetPasswordVerificationScreen() {
 
   const handleClosePreview = () => {
     setIsPreviewVisible(false);
-  };
-
-  const handlePreviewExpire = () => {
-    setIsPreviewVisible(false);
-
-    expirePasswordResetCode();
-
-    setCode('');
-    setStatus('default');
-
-    setError('The verification code has expired. Generate a new code.');
   };
 
   return (
@@ -157,9 +178,23 @@ export default function ResetPasswordVerificationScreen() {
               length={OTP_LENGTH}
               status={status}
               shakeTrigger={shakeTrigger}
-              disabled={isVerifying}
+              disabled={isVerifying || isCodeExpired}
               onChangeText={handleCodeChange}
             />
+
+            {passwordResetCodeExpiresAt ? (
+              <Text
+                style={[
+                  styles.expiryText,
+
+                  isCodeExpired && styles.expiryTextExpired,
+                ]}
+              >
+                {isCodeExpired
+                  ? 'Verification code expired. Generate a new code.'
+                  : `Code expires in ${formattedExpiry}`}
+              </Text>
+            ) : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -180,7 +215,9 @@ export default function ResetPasswordVerificationScreen() {
             title={isVerifying ? 'Verifying...' : 'Verify code'}
             variant="primary"
             loading={isVerifying}
-            disabled={isVerifying || code.length !== OTP_LENGTH}
+            disabled={
+              isVerifying || isCodeExpired || code.length !== OTP_LENGTH
+            }
             onPress={() => {
               void verifyCode(code);
             }}
@@ -191,7 +228,6 @@ export default function ResetPasswordVerificationScreen() {
         visible={isPreviewVisible}
         code={passwordResetPreviewCode}
         onClose={handleClosePreview}
-        onExpire={handlePreviewExpire}
       />
     </>
   );
@@ -214,6 +250,16 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[6],
     marginTop: spacing[12],
+  },
+
+  expiryText: {
+    ...getTypography('bodySmall', 'medium'),
+    color: colors.neutral[500],
+    textAlign: 'center',
+  },
+
+  expiryTextExpired: {
+    color: colors.error.base,
   },
 
   error: {
