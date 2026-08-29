@@ -51,148 +51,6 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-// export async function requestPhoneAuth(phone: string, mode: PhoneAuthMode) {
-//   const { error } = await supabase.auth.signInWithOtp({
-//     phone: phone.trim(),
-
-//     options: {
-//       shouldCreateUser: mode === 'sign-up',
-//     },
-//   });
-
-//   if (error) {
-//     throw error;
-//   }
-// }
-
-// export async function requestPasswordReset(email: string) {
-//   const normalizedEmail = email.trim().toLowerCase();
-
-//   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
-
-//   if (error) {
-//     throw error;
-//   }
-// }
-
-export async function requestPasswordReset(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  console.log('PASSWORD RESET: starting', normalizedEmail);
-
-  try {
-    const { error } =
-      await supabase.auth.resetPasswordForEmail(normalizedEmail);
-
-    console.log('PASSWORD RESET: Supabase responded', {
-      error,
-    });
-
-    if (error) {
-      throw error;
-    }
-  } catch (error) {
-    console.error('PASSWORD RESET REQUEST FAILED:', error);
-
-    throw error;
-  }
-}
-
-export async function verifyPasswordRecoveryCode(email: string, token: string) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: email.trim().toLowerCase(),
-    token: token.trim(),
-    type: 'recovery',
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data.session) {
-    throw new Error('Unable to start password recovery session.');
-  }
-
-  return data;
-}
-
-export async function updateRecoveredPassword(password: string) {
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const { error: signOutError } = await supabase.auth.signOut({
-    scope: 'global',
-  });
-
-  if (signOutError) {
-    throw signOutError;
-  }
-}
-
-// export async function requestPhoneVerification(phone: string) {
-//   const normalizedPhone = phone.trim();
-
-//   const { data, error } = await supabase.auth.updateUser({
-//     phone: normalizedPhone,
-
-//     data: {
-//       /*
-//        * Temporarily save this so the OTP
-//        * flow can recover it if necessary.
-//        */
-//       registration_phone: normalizedPhone,
-//     },
-//   });
-
-//   if (error) {
-//     throw error;
-//   }
-
-//   return data;
-// }
-
-// export async function verifyPhoneChange(phone: string, token: string) {
-//   const { data, error } = await supabase.auth.verifyOtp({
-//     phone: phone.trim(),
-//     token: token.trim(),
-//     type: 'phone_change',
-//   });
-
-//   if (error) {
-//     throw error;
-//   }
-
-//   const { error: metadataError } = await supabase.auth.updateUser({
-//     data: {
-//       registration_phone: null,
-//     },
-//   });
-
-//   if (metadataError) {
-//     console.warn(
-//       'Unable to clear temporary phone metadata:',
-//       metadataError.message,
-//     );
-//   }
-
-//   return data;
-// }
-
-// export async function resendPhoneVerification(phone: string) {
-//   const { error } = await supabase.auth.resend({
-//     type: 'phone_change',
-//     phone: phone.trim(),
-//   });
-
-//   if (error) {
-//     throw error;
-//   }
-// }
 
 export async function markWelcomeSeen() {
   const { data, error } = await supabase.auth.updateUser({
@@ -334,19 +192,27 @@ export async function saveRegistrationPhone(
   return data;
 }
 
-export type DevPasswordResetChallenge = {
+export type PasswordResetChallenge = {
+  challengeId: string;
   code: string;
+  expiresAt: string;
 };
 
-export async function requestDevPasswordReset(
+export type PasswordResetVerification = {
+  resetToken: string;
+  resetTokenExpiresAt: string;
+};
+
+export async function startInAppPasswordRecovery(
   email: string,
-): Promise<DevPasswordResetChallenge> {
+): Promise<PasswordResetChallenge> {
   const normalizedEmail = email.trim().toLowerCase();
 
   const { data, error } = await supabase.functions.invoke(
-    'dev-password-recovery',
+    'password-recovery',
     {
       body: {
+        action: 'start',
         email: normalizedEmail,
       },
     },
@@ -356,11 +222,81 @@ export async function requestDevPasswordReset(
     throw error;
   }
 
-  if (!data?.code) {
-    throw new Error('Unable to generate development recovery code.');
+  if (
+    !data?.challengeId ||
+    !data?.code ||
+    !data?.expiresAt
+  ) {
+    throw new Error(
+      data?.error ?? 'Unable to generate password recovery code.',
+    );
   }
 
   return {
+    challengeId: String(data.challengeId),
     code: String(data.code),
+    expiresAt: String(data.expiresAt),
   };
+}
+
+export async function verifyInAppPasswordRecovery(
+  challengeId: string,
+  code: string,
+): Promise<PasswordResetVerification> {
+  const { data, error } = await supabase.functions.invoke(
+    'password-recovery',
+    {
+      body: {
+        action: 'verify',
+        challengeId,
+        code: code.trim(),
+      },
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (
+    !data?.resetToken ||
+    !data?.resetTokenExpiresAt
+  ) {
+    throw new Error(
+      data?.error ?? 'Unable to verify password recovery code.',
+    );
+  }
+
+  return {
+    resetToken: String(data.resetToken),
+    resetTokenExpiresAt: String(data.resetTokenExpiresAt),
+  };
+}
+
+export async function completeInAppPasswordRecovery(
+  resetToken: string,
+  password: string,
+) {
+  const { data, error } = await supabase.functions.invoke(
+    'password-recovery',
+    {
+      body: {
+        action: 'complete',
+        resetToken,
+        password,
+      },
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (data?.success !== true) {
+    throw new Error(
+      data?.error ?? 'Unable to update your password.',
+    );
+  }
+
+  return data;
 }

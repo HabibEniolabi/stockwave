@@ -11,13 +11,15 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 import {
+  completeInAppPasswordRecovery,
   getInAppVerificationStatus,
   markWelcomeSeen,
   saveRegistrationPhone as saveRegistrationPhoneMetadata,
   signInWithEmail,
   signUpWithEmail,
+  startInAppPasswordRecovery,
   startInAppVerification,
-  updateRecoveredPassword,
+  verifyInAppPasswordRecovery,
   verifyInAppVerification,
   type SignUpPayload,
 } from '../services/auth';
@@ -68,7 +70,6 @@ type AppSessionContextValue = {
 
   createPin: (pin: string) => Promise<void>;
   verifyPin: (pin: string) => Promise<boolean>;
-  expirePasswordResetCode: () => void;
   passwordResetCodeExpiresAt: number | null;
   unlockApp: () => void;
   lockApp: () => void;
@@ -120,14 +121,14 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
   const [passwordResetCodeExpiresAt, setPasswordResetCodeExpiresAt] = useState<
     number | null
   >(null);
+  const [passwordResetChallengeId, setPasswordResetChallengeId] = useState('');
+  const [passwordResetToken, setPasswordResetToken] = useState('');
 
   const user = session?.user ?? null;
 
   const isAuthenticated = Boolean(session);
 
   const hasRegistrationPhone = Boolean(user?.user_metadata?.registration_phone);
-
-  const PASSWORD_RESET_CODE_DURATION = 5 * 60 * 1000;
 
   const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
@@ -294,9 +295,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     };
   }, [isSessionReady, user?.id]);
 
-  const generatePasswordResetCode = () =>
-    Math.floor(100000 + Math.random() * 900000).toString();
-
   const signIn = async (email: string, password: string) => {
     const data = await signInWithEmail(email, password);
 
@@ -399,13 +397,25 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('Email address is required.');
     }
 
-    const code = generatePasswordResetCode();
-    const expiresAt = Date.now() + PASSWORD_RESET_CODE_DURATION;
+    const challenge = await startInAppPasswordRecovery(normalizedEmail);
+
+    const expiresAt = new Date(challenge.expiresAt).getTime();
+
+    if (!Number.isFinite(expiresAt)) {
+      throw new Error('Unable to determine password recovery code expiry.');
+    }
 
     setResetPasswordEmail(normalizedEmail);
+
     setResetPasswordVerified(false);
-    setPasswordResetPreviewCode(code);
+
+    setPasswordResetChallengeId(challenge.challengeId);
+
+    setPasswordResetPreviewCode(challenge.code);
+
     setPasswordResetCodeExpiresAt(expiresAt);
+
+    setPasswordResetToken('');
   };
 
   const resendPasswordResetCode = async () => {
@@ -413,12 +423,23 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('No password reset is currently in progress.');
     }
 
-    const code = generatePasswordResetCode();
-    const expiresAt = Date.now() + PASSWORD_RESET_CODE_DURATION;
+    const challenge = await startInAppPasswordRecovery(resetPasswordEmail);
 
-    setPasswordResetPreviewCode(code);
+    const expiresAt = new Date(challenge.expiresAt).getTime();
+
+    if (!Number.isFinite(expiresAt)) {
+      throw new Error('Unable to determine password recovery code expiry.');
+    }
+
+    setPasswordResetChallengeId(challenge.challengeId);
+
+    setPasswordResetPreviewCode(challenge.code);
+
     setPasswordResetCodeExpiresAt(expiresAt);
+
     setResetPasswordVerified(false);
+
+    setPasswordResetToken('');
   };
 
   const verifyPasswordResetCode = async (code: string) => {
@@ -426,7 +447,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('No password reset is currently in progress.');
     }
 
-    if (!passwordResetPreviewCode || !passwordResetCodeExpiresAt) {
+    if (!passwordResetChallengeId || !passwordResetCodeExpiresAt) {
       throw new Error('No verification code is currently active.');
     }
 
@@ -435,6 +456,8 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
       setPasswordResetCodeExpiresAt(null);
 
+      setPasswordResetChallengeId('');
+
       setResetPasswordVerified(false);
 
       throw new Error(
@@ -442,28 +465,39 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       );
     }
 
-    if (code.trim() !== passwordResetPreviewCode) {
-      throw new Error('The verification code is incorrect.');
-    }
+    const verification = await verifyInAppPasswordRecovery(
+      passwordResetChallengeId,
+      code,
+    );
 
     setPasswordResetPreviewCode('');
 
     setPasswordResetCodeExpiresAt(null);
+
+    setPasswordResetToken(verification.resetToken);
 
     setResetPasswordVerified(true);
   };
 
   const completePasswordReset = async (password: string) => {
-    if (!resetPasswordVerified) {
+    if (!resetPasswordVerified || !passwordResetToken) {
       throw new Error('Password recovery has not been verified.');
     }
 
-    await updateRecoveredPassword(password);
+    await completeInAppPasswordRecovery(passwordResetToken, password);
 
     setResetPasswordEmail('');
+
     setResetPasswordVerified(false);
-    setPasswordResetCodeExpiresAt(null);
+
     setPasswordResetPreviewCode('');
+
+    setPasswordResetCodeExpiresAt(null);
+
+    setPasswordResetChallengeId('');
+
+    setPasswordResetToken('');
+
     setIsAppUnlocked(false);
   };
 
@@ -500,12 +534,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsAppUnlocked(false);
     setIsDeviceSecurityReady(true);
     setIsVerificationReady(true);
-  };
-
-  const expirePasswordResetCode = () => {
-    setPasswordResetPreviewCode('');
-
-    setResetPasswordVerified(false);
   };
 
   const resetSession = async () => {
@@ -551,6 +579,8 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsDeviceSecurityReady(true);
     setPasswordResetCodeExpiresAt(null);
     setIsVerificationReady(true);
+    setPasswordResetChallengeId('');
+    setPasswordResetToken('');
   };
 
   return (
@@ -595,7 +625,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         startPasswordReset,
         resendPasswordResetCode,
         verifyPasswordResetCode,
-        expirePasswordResetCode,
         completePasswordReset,
         passwordResetCodeExpiresAt,
 
