@@ -121,7 +121,8 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
   const [passwordResetCodeExpiresAt, setPasswordResetCodeExpiresAt] = useState<
     number | null
   >(null);
-  const [passwordResetChallengeId, setPasswordResetChallengeId] = useState('');
+  const [passwordResetChallengeToken, setPasswordResetChallengeToken] =
+    useState('');
   const [passwordResetToken, setPasswordResetToken] = useState('');
 
   const user = session?.user ?? null;
@@ -409,7 +410,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
     setResetPasswordVerified(false);
 
-    setPasswordResetChallengeId(challenge.challengeId);
+    setPasswordResetChallengeToken(challenge.challengeToken);
 
     setPasswordResetPreviewCode(challenge.code);
 
@@ -431,7 +432,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('Unable to determine password recovery code expiry.');
     }
 
-    setPasswordResetChallengeId(challenge.challengeId);
+    setPasswordResetChallengeToken(challenge.challengeToken);
 
     setPasswordResetPreviewCode(challenge.code);
 
@@ -447,7 +448,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw new Error('No password reset is currently in progress.');
     }
 
-    if (!passwordResetChallengeId || !passwordResetCodeExpiresAt) {
+    if (!passwordResetChallengeToken || !passwordResetCodeExpiresAt) {
       throw new Error('No verification code is currently active.');
     }
 
@@ -456,7 +457,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
       setPasswordResetCodeExpiresAt(null);
 
-      setPasswordResetChallengeId('');
+      setPasswordResetChallengeToken('');
 
       setResetPasswordVerified(false);
 
@@ -466,7 +467,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     }
 
     const verification = await verifyInAppPasswordRecovery(
-      passwordResetChallengeId,
+      passwordResetChallengeToken,
       code,
     );
 
@@ -487,17 +488,11 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     await completeInAppPasswordRecovery(passwordResetToken, password);
 
     setResetPasswordEmail('');
-
     setResetPasswordVerified(false);
-
     setPasswordResetPreviewCode('');
-
     setPasswordResetCodeExpiresAt(null);
-
-    setPasswordResetChallengeId('');
-
+    setPasswordResetChallengeToken('');
     setPasswordResetToken('');
-
     setIsAppUnlocked(false);
   };
 
@@ -579,7 +574,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setIsDeviceSecurityReady(true);
     setPasswordResetCodeExpiresAt(null);
     setIsVerificationReady(true);
-    setPasswordResetChallengeId('');
+    setPasswordResetChallengeToken('');
     setPasswordResetToken('');
   };
 

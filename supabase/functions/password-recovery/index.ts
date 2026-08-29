@@ -3,8 +3,10 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
+
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -12,24 +14,33 @@ const OTP_DURATION_MS = 5 * 60 * 1000;
 
 const RESET_TOKEN_DURATION_MS = 10 * 60 * 1000;
 
-const MAX_OTP_ATTEMPTS = 5;
-
-type PasswordRecoveryAction = 'start' | 'verify' | 'complete';
-
-type PasswordRecoveryRequest = {
-  action?: PasswordRecoveryAction;
+type RequestBody = {
+  action?: 'start' | 'verify' | 'complete';
 
   email?: string;
 
-  challengeId?: string;
+  challengeToken?: string;
   code?: string;
 
   resetToken?: string;
   password?: string;
 };
 
-const jsonResponse = (body: Record<string, unknown>, status = 200) =>
-  new Response(JSON.stringify(body), {
+type ChallengePayload = {
+  type: 'challenge';
+  userId: string;
+  codeHash: string;
+  expiresAt: number;
+};
+
+type ResetPayload = {
+  type: 'reset';
+  userId: string;
+  expiresAt: number;
+};
+
+const jsonResponse = (body: Record<string, unknown>, status = 200) => {
+  return new Response(JSON.stringify(body), {
     status,
 
     headers: {
@@ -38,6 +49,7 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
       'Content-Type': 'application/json',
     },
   });
+};
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -49,16 +61,6 @@ const generateOtp = () => {
   return (100000 + (values[0] % 900000)).toString();
 };
 
-const generateResetToken = () => {
-  const bytes = new Uint8Array(32);
-
-  crypto.getRandomValues(bytes);
-
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join(
-    '',
-  );
-};
-
 const sha256 = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
 
@@ -67,6 +69,96 @@ const sha256 = async (value: string) => {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+};
+
+const toBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+};
+
+const fromBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+
+  const binary = atob(padded);
+
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const createSignature = async (payload: string, secret: string) => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+
+    new TextEncoder().encode(secret),
+
+    {
+      name: 'HMAC',
+
+      hash: 'SHA-256',
+    },
+
+    false,
+
+    ['sign'],
+  );
+
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+
+    key,
+
+    new TextEncoder().encode(payload),
+  );
+
+  return toBase64Url(new Uint8Array(signature));
+};
+
+const createToken = async (
+  payload: ChallengePayload | ResetPayload,
+
+  secret: string,
+) => {
+  const encodedPayload = toBase64Url(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
+
+  const signature = await createSignature(encodedPayload, secret);
+
+  return `${encodedPayload}.${signature}`;
+};
+
+const verifyToken = async <T extends ChallengePayload | ResetPayload>(
+  token: string,
+  secret: string,
+): Promise<T | null> => {
+  const [encodedPayload, signature] = token.split('.');
+
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = await createSignature(encodedPayload, secret);
+
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  try {
+    const json = new TextDecoder().decode(fromBase64Url(encodedPayload));
+
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
 };
 
 Deno.serve(async (request) => {
@@ -90,59 +182,44 @@ Deno.serve(async (request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Password recovery environment is not configured.');
-
     return jsonResponse(
       {
-        error: 'Password recovery service is unavailable.',
+        error: 'Password recovery service is not configured.',
       },
       500,
     );
   }
 
   /*
-   * IMPORTANT:
+   * We derive the signing secret
+   * from the server-only service
+   * role key.
    *
-   * This client has privileged access.
-   * It must exist ONLY inside the
-   * Edge Function.
-   *
-   * Never expose the service-role key
-   * to the React Native application.
+   * Nothing secret is sent to the app.
    */
+  const signingSecret = await sha256(
+    `stockwave-password-recovery:${serviceRoleKey}`,
+  );
+
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
-      persistSession: false,
-
       autoRefreshToken: false,
+
+      persistSession: false,
 
       detectSessionInUrl: false,
     },
   });
 
   try {
-    const body = (await request.json()) as PasswordRecoveryRequest;
-
-    const action = body.action;
+    const body = (await request.json()) as RequestBody;
 
     /*
-     * ------------------------------------------------
+     * ==========================
      * START
-     * ------------------------------------------------
-     *
-     * Email
-     *   ↓
-     * find account
-     *   ↓
-     * generate our own OTP
-     *   ↓
-     * store hash
-     *   ↓
-     * return actual code to the app
-     *
-     * No Supabase OTP is involved.
+     * ==========================
      */
-    if (action === 'start') {
+    if (body.action === 'start') {
       const email = normalizeEmail(body.email ?? '');
 
       if (!email) {
@@ -154,13 +231,6 @@ Deno.serve(async (request) => {
         );
       }
 
-      /*
-       * Find the matching Auth user.
-       *
-       * This uses the server-only Admin
-       * API. It must never run on the
-       * React Native client.
-       */
       let userId: string | null = null;
 
       let page = 1;
@@ -174,15 +244,17 @@ Deno.serve(async (request) => {
         });
 
         if (error) {
+          console.error('LIST USERS ERROR:', error);
+
           throw error;
         }
 
-        const matchingUser = data.users.find(
-          (user) => user.email?.trim().toLowerCase() === email,
+        const user = data.users.find(
+          (item) => item.email?.trim().toLowerCase() === email,
         );
 
-        if (matchingUser) {
-          userId = matchingUser.id;
+        if (user) {
+          userId = user.id;
 
           break;
         }
@@ -203,129 +275,69 @@ Deno.serve(async (request) => {
         );
       }
 
-      /*
-       * Invalidate any previous active
-       * password-recovery challenges
-       * belonging to this user.
-       */
-      const { error: invalidateError } = await admin
-        .from('password_recovery_challenges')
-        .update({
-          used_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
-        .is('used_at', null);
-
-      if (invalidateError) {
-        throw invalidateError;
-      }
-
       const code = generateOtp();
 
       const codeHash = await sha256(code);
 
-      const expiresAt = new Date(Date.now() + OTP_DURATION_MS).toISOString();
+      const expiresAt = Date.now() + OTP_DURATION_MS;
 
-      const { data: challenge, error: insertError } = await admin
-        .from('password_recovery_challenges')
-        .insert({
-          user_id: userId,
+      const challengeToken = await createToken(
+        {
+          type: 'challenge',
 
-          email,
+          userId,
 
-          code_hash: codeHash,
+          codeHash,
 
-          expires_at: expiresAt,
+          expiresAt,
+        },
 
-          attempts: 0,
-        })
-        .select('id')
-        .single();
+        signingSecret,
+      );
 
-      if (insertError) {
-        throw insertError;
-      }
-
-      /*
-       * This is intentionally returned
-       * because your current recovery
-       * design displays the OTP inside
-       * OtpPreviewModal.
-       */
       return jsonResponse({
-        challengeId: challenge.id,
-
         code,
 
-        expiresAt,
+        challengeToken,
+
+        expiresAt: new Date(expiresAt).toISOString(),
       });
     }
 
     /*
-     * ------------------------------------------------
+     * ==========================
      * VERIFY
-     * ------------------------------------------------
+     * ==========================
      */
-    if (action === 'verify') {
-      const challengeId = body.challengeId?.trim();
+    if (body.action === 'verify') {
+      const challengeToken = body.challengeToken?.trim();
 
       const code = body.code?.trim();
 
-      if (!challengeId || !code) {
+      if (!challengeToken || !code) {
         return jsonResponse(
           {
-            error: 'Challenge ID and verification code are required.',
+            error: 'Verification code is required.',
           },
           400,
         );
       }
 
-      const { data: challenge, error: challengeError } = await admin
-        .from('password_recovery_challenges')
-        .select(
-          `
-                id,
-                user_id,
-                code_hash,
-                expires_at,
-                attempts,
-                verified_at,
-                used_at
-              `,
-        )
-        .eq('id', challengeId)
-        .maybeSingle();
+      const challenge = await verifyToken<ChallengePayload>(
+        challengeToken,
+        signingSecret,
+      );
 
-      if (challengeError) {
-        throw challengeError;
-      }
-
-      if (!challenge || challenge.used_at) {
+      if (!challenge || challenge.type !== 'challenge') {
         return jsonResponse(
           {
-            error: 'This verification code is no longer valid.',
+            error: 'Password recovery challenge is invalid.',
           },
-          400,
+          401,
         );
       }
 
-      if (challenge.verified_at) {
-        return jsonResponse(
-          {
-            error: 'This verification code has already been used.',
-          },
-          400,
-        );
-      }
-
-      if (Date.now() >= new Date(challenge.expires_at).getTime()) {
-        await admin
-          .from('password_recovery_challenges')
-          .update({
-            used_at: new Date().toISOString(),
-          })
-          .eq('id', challengeId);
-
+      if (Date.now() >= challenge.expiresAt) {
         return jsonResponse(
           {
             error: 'The verification code has expired. Generate a new code.',
@@ -334,103 +346,44 @@ Deno.serve(async (request) => {
         );
       }
 
-      const attempts = Number(challenge.attempts ?? 0);
-
-      if (attempts >= MAX_OTP_ATTEMPTS) {
-        return jsonResponse(
-          {
-            error: 'Too many incorrect attempts. Generate a new code.',
-          },
-          429,
-        );
-      }
-
       const submittedHash = await sha256(code);
 
-      if (submittedHash !== challenge.code_hash) {
-        const nextAttempts = attempts + 1;
-
-        await admin
-          .from('password_recovery_challenges')
-          .update({
-            attempts: nextAttempts,
-
-            /*
-             * Burn the challenge once
-             * the maximum number of
-             * attempts is reached.
-             */
-            used_at:
-              nextAttempts >= MAX_OTP_ATTEMPTS
-                ? new Date().toISOString()
-                : null,
-          })
-          .eq('id', challengeId);
-
+      if (submittedHash !== challenge.codeHash) {
         return jsonResponse(
           {
-            error:
-              nextAttempts >= MAX_OTP_ATTEMPTS
-                ? 'Too many incorrect attempts. Generate a new code.'
-                : 'The verification code is incorrect.',
+            error: 'The verification code is incorrect.',
           },
-          nextAttempts >= MAX_OTP_ATTEMPTS ? 429 : 400,
+          400,
         );
       }
 
-      /*
-       * OTP is correct.
-       *
-       * Generate a separate random
-       * reset token. The password
-       * screen receives this token,
-       * never administrative Supabase
-       * credentials.
-       */
-      const resetToken = generateResetToken();
+      const resetExpiresAt = Date.now() + RESET_TOKEN_DURATION_MS;
 
-      const resetTokenHash = await sha256(resetToken);
+      const resetToken = await createToken(
+        {
+          type: 'reset',
 
-      const resetTokenExpiresAt = new Date(
-        Date.now() + RESET_TOKEN_DURATION_MS,
-      ).toISOString();
+          userId: challenge.userId,
 
-      const { error: verificationError } = await admin
-        .from('password_recovery_challenges')
-        .update({
-          verified_at: new Date().toISOString(),
+          expiresAt: resetExpiresAt,
+        },
 
-          reset_token_hash: resetTokenHash,
-
-          reset_token_expires_at: resetTokenExpiresAt,
-        })
-        .eq('id', challengeId);
-
-      if (verificationError) {
-        throw verificationError;
-      }
+        signingSecret,
+      );
 
       return jsonResponse({
         resetToken,
 
-        resetTokenExpiresAt,
+        resetTokenExpiresAt: new Date(resetExpiresAt).toISOString(),
       });
     }
 
     /*
-     * ------------------------------------------------
+     * ==========================
      * COMPLETE
-     * ------------------------------------------------
-     *
-     * Reset token
-     *   ↓
-     * validate server-side
-     *   ↓
-     * admin password change
-     *   ↓
-     * challenge consumed
+     * ==========================
      */
-    if (action === 'complete') {
+    if (body.action === 'complete') {
       const resetToken = body.resetToken?.trim();
 
       const password = body.password ?? '';
@@ -440,7 +393,7 @@ Deno.serve(async (request) => {
           {
             error: 'Password reset authorization is missing.',
           },
-          400,
+          401,
         );
       }
 
@@ -453,27 +406,12 @@ Deno.serve(async (request) => {
         );
       }
 
-      const resetTokenHash = await sha256(resetToken);
+      const resetPayload = await verifyToken<ResetPayload>(
+        resetToken,
+        signingSecret,
+      );
 
-      const { data: challenge, error: challengeError } = await admin
-        .from('password_recovery_challenges')
-        .select(
-          `
-                id,
-                user_id,
-                verified_at,
-                reset_token_expires_at,
-                used_at
-              `,
-        )
-        .eq('reset_token_hash', resetTokenHash)
-        .maybeSingle();
-
-      if (challengeError) {
-        throw challengeError;
-      }
-
-      if (!challenge || !challenge.verified_at || challenge.used_at) {
+      if (!resetPayload || resetPayload.type !== 'reset') {
         return jsonResponse(
           {
             error: 'Password reset authorization is invalid.',
@@ -482,17 +420,7 @@ Deno.serve(async (request) => {
         );
       }
 
-      if (
-        !challenge.reset_token_expires_at ||
-        Date.now() >= new Date(challenge.reset_token_expires_at).getTime()
-      ) {
-        await admin
-          .from('password_recovery_challenges')
-          .update({
-            used_at: new Date().toISOString(),
-          })
-          .eq('id', challenge.id);
-
+      if (Date.now() >= resetPayload.expiresAt) {
         return jsonResponse(
           {
             error: 'Password reset authorization has expired. Start again.',
@@ -501,44 +429,17 @@ Deno.serve(async (request) => {
         );
       }
 
-      /*
-       * THIS is the part that fixes
-       * "Auth session missing".
-       *
-       * updateUserById() runs with the
-       * server-side admin client and
-       * therefore does not require a
-       * recovery session in the app.
-       */
-      const { error: passwordError } = await admin.auth.admin.updateUserById(
-        challenge.user_id,
+      const { error } = await admin.auth.admin.updateUserById(
+        resetPayload.userId,
         {
           password,
         },
       );
 
-      if (passwordError) {
-        throw passwordError;
-      }
+      if (error) {
+        console.error('PASSWORD UPDATE ERROR:', error);
 
-      /*
-       * Prevent the reset token from
-       * ever being reused.
-       */
-      const { error: consumeError } = await admin
-        .from('password_recovery_challenges')
-        .update({
-          used_at: new Date().toISOString(),
-
-          reset_token_hash: null,
-        })
-        .eq('id', challenge.id);
-
-      if (consumeError) {
-        console.error(
-          'Password changed but recovery challenge could not be consumed:',
-          consumeError,
-        );
+        throw error;
       }
 
       return jsonResponse({
@@ -548,19 +449,16 @@ Deno.serve(async (request) => {
 
     return jsonResponse(
       {
-        error: 'Invalid password recovery action.',
+        error: 'Invalid recovery action.',
       },
       400,
     );
   } catch (error) {
-    console.error('Password recovery failed:', error);
+    console.error('PASSWORD RECOVERY ERROR:', error);
 
     return jsonResponse(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unable to process password recovery.',
+        error: error instanceof Error ? error.message : String(error),
       },
       500,
     );
