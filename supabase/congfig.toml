@@ -1,2 +1,5 @@
 [functions.delete-account]
 verify_jwt = true
+
+[functions.password-recovery]
+verify_jwt = false

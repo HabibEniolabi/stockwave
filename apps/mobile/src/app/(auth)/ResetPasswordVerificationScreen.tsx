@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -20,35 +20,72 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 import { getTypography } from '../../theme/typography';
+import { OtpPreviewModal } from '../../components/ui/OtpPreviewModal';
 
 const OTP_LENGTH = 6;
 
 export default function ResetPasswordVerificationScreen() {
   const {
     resetPasswordEmail,
-
+    passwordResetPreviewCode,
     verifyPasswordResetCode,
     resendPasswordResetCode,
+    passwordResetCodeExpiresAt,
   } = useAppSession();
 
   const [code, setCode] = useState('');
-
   const [status, setStatus] = useState<OtpStatus>('default');
-
   const [shakeTrigger, setShakeTrigger] = useState(0);
-
   const [error, setError] = useState('');
-
   const [isVerifying, setIsVerifying] = useState(false);
-
   const [isResending, setIsResending] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  const [isPreviewVisible, setIsPreviewVisible] = useState(
+    Boolean(passwordResetPreviewCode),
+  );
+
+  useEffect(() => {
+    if (passwordResetPreviewCode) {
+      setIsPreviewVisible(true);
+    }
+  }, [passwordResetPreviewCode]);
+
+  useEffect(() => {
+    if (!passwordResetCodeExpiresAt) {
+      return;
+    }
+
+    setNow(Date.now());
+
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [passwordResetCodeExpiresAt]);
+
+  const remainingSeconds = passwordResetCodeExpiresAt
+    ? Math.max(0, Math.ceil((passwordResetCodeExpiresAt - now) / 1000))
+    : 0;
+
+  const isCodeExpired =
+    Boolean(passwordResetCodeExpiresAt) && remainingSeconds === 0;
+
+  const minutes = Math.floor(remainingSeconds / 60);
+
+  const seconds = remainingSeconds % 60;
+
+  const formattedExpiry = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   if (!resetPasswordEmail) {
-    return <Redirect href="/(auth)/forgot-password" />;
+    return <Redirect href="/(auth)/ForgotPasswordScreen" />;
   }
 
   const verifyCode = async (value: string) => {
-    if (isVerifying || value.length !== OTP_LENGTH) {
+    if (isVerifying || isCodeExpired || value.length !== OTP_LENGTH) {
       return;
     }
 
@@ -87,13 +124,13 @@ export default function ResetPasswordVerificationScreen() {
     setStatus('default');
     setError('');
 
-    if (value.length === OTP_LENGTH) {
+    if (value.length === OTP_LENGTH && !isCodeExpired) {
       void verifyCode(value);
     }
   };
 
   const handleResend = async () => {
-    if (isResending) {
+    if (isResending || isVerifying) {
       return;
     }
 
@@ -105,63 +142,94 @@ export default function ResetPasswordVerificationScreen() {
       setStatus('default');
 
       await resendPasswordResetCode();
+
+      setNow(Date.now());
+
+      setIsPreviewVisible(true);
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
-          : 'Unable to resend verification code.',
+          : 'Unable to generate a new verification code.',
       );
     } finally {
       setIsResending(false);
     }
   };
 
+  const handleClosePreview = () => {
+    setIsPreviewVisible(false);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <BackButton onPress={() => router.back()} />
+    <>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <BackButton onPress={() => router.back()} />
 
-        <View style={styles.content}>
-          <AuthHeader
-            title="Enter verification code"
-            description={`We sent a 6-digit verification code to\n${resetPasswordEmail}`}
-          />
+          <View style={styles.content}>
+            <AuthHeader
+              title="Enter verification code"
+              description="Enter the 6-digit recovery code shown below "
+            />
 
-          <OtpInput
-            value={code}
-            length={OTP_LENGTH}
-            status={status}
-            shakeTrigger={shakeTrigger}
-            disabled={isVerifying}
-            onChangeText={handleCodeChange}
-          />
+            <OtpInput
+              value={code}
+              length={OTP_LENGTH}
+              status={status}
+              shakeTrigger={shakeTrigger}
+              disabled={isVerifying || isCodeExpired}
+              onChangeText={handleCodeChange}
+            />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            {passwordResetCodeExpiresAt ? (
+              <Text
+                style={[
+                  styles.expiryText,
 
-          <Pressable
-            disabled={isResending}
-            hitSlop={8}
+                  isCodeExpired && styles.expiryTextExpired,
+                ]}
+              >
+                {isCodeExpired
+                  ? 'Verification code expired. Generate a new code.'
+                  : `Code expires in ${formattedExpiry}`}
+              </Text>
+            ) : null}
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Pressable
+              disabled={isResending || isVerifying}
+              hitSlop={8}
+              onPress={() => {
+                void handleResend();
+              }}
+            >
+              <Text style={styles.resend}>
+                {isResending ? 'Generating...' : 'Generate new code'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Button
+            title={isVerifying ? 'Verifying...' : 'Verify code'}
+            variant="primary"
+            loading={isVerifying}
+            disabled={
+              isVerifying || isCodeExpired || code.length !== OTP_LENGTH
+            }
             onPress={() => {
-              void handleResend();
+              void verifyCode(code);
             }}
-          >
-            <Text style={styles.resend}>
-              {isResending ? 'Resending...' : 'Resend code'}
-            </Text>
-          </Pressable>
+          />
         </View>
-
-        <Button
-          title={isVerifying ? 'Verifying...' : 'Verify code'}
-          variant="primary"
-          loading={isVerifying}
-          disabled={code.length !== OTP_LENGTH}
-          onPress={() => {
-            void verifyCode(code);
-          }}
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <OtpPreviewModal
+        visible={isPreviewVisible}
+        code={passwordResetPreviewCode}
+        onClose={handleClosePreview}
+      />
+    </>
   );
 }
 
@@ -184,19 +252,25 @@ const styles = StyleSheet.create({
     marginTop: spacing[12],
   },
 
+  expiryText: {
+    ...getTypography('bodySmall', 'medium'),
+    color: colors.neutral[500],
+    textAlign: 'center',
+  },
+
+  expiryTextExpired: {
+    color: colors.error.base,
+  },
+
   error: {
     ...getTypography('bodySmall'),
-
     color: colors.error.base,
-
     textAlign: 'center',
   },
 
   resend: {
     ...getTypography('bodyMedium', 'semiBold'),
-
     color: colors.primary[100],
-
     textAlign: 'center',
   },
 });

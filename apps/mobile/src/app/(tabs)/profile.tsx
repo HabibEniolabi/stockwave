@@ -67,10 +67,6 @@ export default function ProfileScreen() {
       await signOutCurrentDevice();
 
       setIsAccountModalVisible(false);
-
-      router.dismissAll();
-
-      router.replace('/(auth)/sign-in');
     } catch (error) {
       console.error('SIGN OUT ERROR', error);
 
@@ -96,10 +92,6 @@ export default function ProfileScreen() {
       await resetSession();
 
       setIsAccountModalVisible(false);
-
-      router.dismissAll();
-
-      router.replace('/(auth)/sign-in');
     } catch (error) {
       console.error('DELETE ACCOUNT ERROR', error);
 

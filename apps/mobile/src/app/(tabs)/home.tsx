@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, InteractionManager } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BiometricSetupModal } from '../../components/modals/BiometricSetupModal';
 import { Button } from '../../components/ui/Button';
@@ -37,9 +37,7 @@ export default function HomeScreen() {
   const handleContinueToPin = () => {
     setIsSecuritySetupVisible(false);
 
-    InteractionManager.runAfterInteractions(() => {
-      router.replace('/(security)/CreatePinScreen');
-    });
+    router.push('/(security)/CreatePinScreen');
   };
 
   return (
@@ -78,10 +76,14 @@ export default function HomeScreen() {
         </View>
       </SafeAreaView>
 
-      <BiometricSetupModal
-        visible={isSecuritySetupVisible}
-        onContinueToPin={handleContinueToPin}
-      />
+      {isSecuritySetupVisible ? (
+  <BiometricSetupModal
+    visible
+    onContinueToPin={
+      handleContinueToPin
+    }
+  />
+) : null}
     </>
   );
 }
