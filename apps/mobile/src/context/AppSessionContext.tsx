@@ -297,17 +297,13 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
   }, [isSessionReady, user?.id]);
 
   const signIn = async (email: string, password: string) => {
-    const data = await signInWithEmail(email, password);
-
-    syncSession(data.session);
+    await signInWithEmail(email, password);
 
     setIsAppUnlocked(true);
   };
 
   const signUp = async (payload: SignUpPayload) => {
-    const data = await signUpWithEmail(payload);
-
-    syncSession(data.session);
+    await signUpWithEmail(payload);
 
     setHasCompletedVerification(false);
     setIsAppUnlocked(true);
@@ -504,18 +500,6 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     if (error) {
       throw error;
     }
-
-    /*
-     * IMPORTANT:
-     *
-     * Do not call clearDeviceSecurity()
-     * here.
-     *
-     * Ordinary logout should preserve the
-     * PIN/biometric configuration belonging
-     * to this user on this installation.
-     */
-    syncSession(null);
 
     /*
      * Clear in-memory state because there
