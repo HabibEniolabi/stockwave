@@ -1,19 +1,12 @@
 
 import { Redirect, Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-
 import HomeTabIcon from '../../assets/icons/HomeTabIcon';
-
 import MarketTabIcon from '../../assets/icons/MarketTabIcon';
-
 import PortfolioTabIcon from '../../assets/icons/PortfolioTabIcon';
-
 import ProfileTabIcon from '../../assets/icons/ProfileTabIcon';
-
 import SwapTabIcon from '../../assets/icons/SwapTabIcon';
-
 import { useAppSession } from '../../context/AppSessionContext';
-
 import { colors } from '../../theme/colors';
 
 export default function TabsLayout() {
@@ -28,8 +21,7 @@ export default function TabsLayout() {
     hasCompletedVerification,
     hasSeenWelcome,
 
-    pinCreated,
-    isAppUnlocked,
+    shouldRequireAppUnlock
   } = useAppSession();
 
   if (!isSessionReady || !isVerificationReady || !isDeviceSecurityReady) {
@@ -56,7 +48,7 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/WelcomeScreen" />;
   }
 
-  if (pinCreated && !isAppUnlocked) {
+  if (shouldRequireAppUnlock) {
     return <Redirect href="/(security)/UnlockPinScreen" />;
   }
 
