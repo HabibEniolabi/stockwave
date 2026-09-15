@@ -2,9 +2,12 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
+
+import { AppState, type AppStateStatus } from 'react-native';
 
 import type { Session, User } from '@supabase/supabase-js';
 
@@ -32,6 +35,26 @@ import {
   setDeviceBiometricsEnabled,
   verifyDevicePin,
 } from '../services/deviceSecurity';
+
+/*
+ * How long the user may leave StockWave before
+ * we require PIN / biometrics again.
+ *
+ * 30 seconds gives enough time to briefly open
+ * another app without constantly relocking.
+ */
+const APP_LOCK_GRACE_PERIOD_MS = 30 * 1000;
+
+/*
+ * DEVELOPMENT ONLY.
+ *
+ * Set this to true while you're actively
+ * developing Home and don't want PIN interruptions.
+ *
+ * Because __DEV__ is required, this can never
+ * bypass the lock in a production build.
+ */
+const DEV_BYPASS_APP_LOCK = __DEV__ && false;
 
 type VerificationChallenge = {
   code: string;
@@ -68,17 +91,28 @@ type AppSessionContextValue = {
   pinCreated: boolean;
   isAppUnlocked: boolean;
 
+  /*
+   * Screens/layouts should use this rather
+   * than rebuilding lock conditions themselves.
+   */
+  shouldRequireAppUnlock: boolean;
+
   createPin: (pin: string) => Promise<void>;
+
   verifyPin: (pin: string) => Promise<boolean>;
-  passwordResetCodeExpiresAt: number | null;
+
   unlockApp: () => void;
   lockApp: () => void;
 
   enableBiometrics: () => Promise<void>;
 
   resetPasswordEmail: string;
+
   resetPasswordVerified: boolean;
+
   passwordResetPreviewCode: string;
+
+  passwordResetCodeExpiresAt: number | null;
 
   startPasswordReset: (email: string) => Promise<void>;
 
@@ -110,26 +144,59 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
   const [hasCompletedVerification, setHasCompletedVerification] =
     useState(false);
+
   const [isVerificationReady, setIsVerificationReady] = useState(false);
+
   const [isDeviceSecurityReady, setIsDeviceSecurityReady] = useState(false);
+
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+
   const [pinCreated, setPinCreated] = useState(false);
+
   const [isAppUnlocked, setIsAppUnlocked] = useState(false);
+
   const [resetPasswordEmail, setResetPasswordEmail] = useState('');
+
   const [resetPasswordVerified, setResetPasswordVerified] = useState(false);
+
   const [passwordResetPreviewCode, setPasswordResetPreviewCode] = useState('');
+
   const [passwordResetCodeExpiresAt, setPasswordResetCodeExpiresAt] = useState<
     number | null
   >(null);
+
   const [passwordResetChallengeToken, setPasswordResetChallengeToken] =
     useState('');
+
   const [passwordResetToken, setPasswordResetToken] = useState('');
+
+  /*
+   * Track the native application lifecycle.
+   *
+   * appStateRef:
+   * active / inactive / background
+   *
+   * backgroundedAtRef:
+   * when the user left StockWave.
+   */
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  const backgroundedAtRef = useRef<number | null>(null);
 
   const user = session?.user ?? null;
 
   const isAuthenticated = Boolean(session);
 
   const hasRegistrationPhone = Boolean(user?.user_metadata?.registration_phone);
+
+  /*
+   * Central condition used by navigation.
+   *
+   * Development bypass affects only the
+   * local app lock. It does not fake auth.
+   */
+  const shouldRequireAppUnlock =
+    !DEV_BYPASS_APP_LOCK && pinCreated && !isAppUnlocked;
 
   const syncSession = (nextSession: Session | null) => {
     setSession(nextSession);
@@ -138,6 +205,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
     if (!nextUser) {
       setHasSeenWelcome(false);
+
       setHasCompletedVerification(false);
 
       return;
@@ -146,6 +214,9 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setHasSeenWelcome(Boolean(nextUser.user_metadata?.has_seen_welcome));
   };
 
+  /*
+   * Restore Supabase session.
+   */
   useEffect(() => {
     let mounted = true;
 
@@ -162,7 +233,16 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
       syncSession(data.session);
 
+      /*
+       * Cold-starting StockWave always
+       * begins locally locked.
+       *
+       * The navigation guard decides whether
+       * an actual PIN exists and therefore
+       * whether UnlockPinScreen is necessary.
+       */
       setIsAppUnlocked(false);
+
       setIsSessionReady(true);
     };
 
@@ -176,6 +256,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       }
 
       syncSession(nextSession);
+
       setIsSessionReady(true);
     });
 
@@ -186,6 +267,9 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     };
   }, []);
 
+  /*
+   * Restore onboarding verification.
+   */
   useEffect(() => {
     let active = true;
 
@@ -236,6 +320,10 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     };
   }, [isSessionReady, user?.id]);
 
+  /*
+   * Restore persisted PIN and biometric
+   * configuration for this specific user.
+   */
   useEffect(() => {
     let active = true;
 
@@ -252,7 +340,9 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         }
 
         setPinCreated(false);
+
         setBiometricEnabled(false);
+
         setIsAppUnlocked(false);
 
         setIsDeviceSecurityReady(true);
@@ -263,6 +353,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       try {
         const [hasPin, biometricsEnabled] = await Promise.all([
           hasDevicePin(user.id),
+
           getDeviceBiometricsEnabled(user.id),
         ]);
 
@@ -281,6 +372,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         }
 
         setPinCreated(false);
+
         setBiometricEnabled(false);
       } finally {
         if (active) {
@@ -296,16 +388,97 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     };
   }, [isSessionReady, user?.id]);
 
-  const signIn = async (email: string, password: string) => {
-    await signInWithEmail(email, password);
+  /*
+   * ---------------------------------------------------
+   * APPLICATION BACKGROUND LOCK
+   * ---------------------------------------------------
+   *
+   * This does NOT log the user out.
+   *
+   * Supabase remains authenticated.
+   * We only set isAppUnlocked = false.
+   *
+   * When TabsLayout sees that state it
+   * redirects the user to UnlockPinScreen.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      const previousAppState = appStateRef.current;
 
+      /*
+       * User is leaving StockWave.
+       *
+       * iOS frequently goes:
+       *
+       * active
+       * → inactive
+       * → background
+       */
+      const isLeavingApp =
+        previousAppState === 'active' &&
+        (nextAppState === 'inactive' || nextAppState === 'background');
+
+      if (isLeavingApp && isAuthenticated && pinCreated) {
+        backgroundedAtRef.current = Date.now();
+      }
+
+      /*
+       * User has returned to StockWave.
+       */
+      const isReturningToApp =
+        nextAppState === 'active' &&
+        (previousAppState === 'inactive' || previousAppState === 'background');
+
+      if (isReturningToApp) {
+        const backgroundedAt = backgroundedAtRef.current;
+
+        backgroundedAtRef.current = null;
+
+        if (
+          !DEV_BYPASS_APP_LOCK &&
+          isAuthenticated &&
+          pinCreated &&
+          backgroundedAt
+        ) {
+          const timeAway = Date.now() - backgroundedAt;
+
+          /*
+           * Only lock after the user has
+           * been away long enough.
+           */
+          if (timeAway >= APP_LOCK_GRACE_PERIOD_MS) {
+            setIsAppUnlocked(false);
+          }
+        }
+      }
+
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isAuthenticated, pinCreated]);
+
+  const signIn = async (email: string, password: string) => {
+    const data = await signInWithEmail(email, password);
+
+    syncSession(data.session);
+
+    /*
+     * Email/password authentication itself
+     * counts as fresh authentication.
+     */
     setIsAppUnlocked(true);
   };
 
   const signUp = async (payload: SignUpPayload) => {
-    await signUpWithEmail(payload);
+    const data = await signUpWithEmail(payload);
+
+    syncSession(data.session);
 
     setHasCompletedVerification(false);
+
     setIsAppUnlocked(true);
   };
 
@@ -317,6 +490,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     if (currentSession && data.user) {
       syncSession({
         ...currentSession,
+
         user: data.user,
       });
 
@@ -356,6 +530,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     await saveDevicePin(user.id, pin);
 
     setPinCreated(true);
+
     setIsAppUnlocked(true);
   };
 
@@ -386,6 +561,12 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
     setBiometricEnabled(true);
   };
+
+  /*
+   * ---------------------------------------------------
+   * PASSWORD RECOVERY
+   * ---------------------------------------------------
+   */
 
   const startPasswordReset = async (email: string) => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -489,9 +670,18 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
     setPasswordResetCodeExpiresAt(null);
     setPasswordResetChallengeToken('');
     setPasswordResetToken('');
+
     setIsAppUnlocked(false);
   };
 
+  /*
+   * ---------------------------------------------------
+   * SIGN OUT
+   * ---------------------------------------------------
+   *
+   * Normal sign-out preserves the PIN and
+   * biometric configuration stored for the user.
+   */
   const signOutCurrentDevice = async () => {
     const { error } = await supabase.auth.signOut({
       scope: 'local',
@@ -501,40 +691,36 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       throw error;
     }
 
-    /*
-     * Clear in-memory state because there
-     * is currently no authenticated user.
-     *
-     * The persisted PIN/biometric values
-     * have NOT been deleted.
-     */
+    syncSession(null);
+
     setPinCreated(false);
+
     setBiometricEnabled(false);
+
     setIsAppUnlocked(false);
+
     setIsDeviceSecurityReady(true);
+
     setIsVerificationReady(true);
+
+    backgroundedAtRef.current = null;
   };
 
+  /*
+   * ---------------------------------------------------
+   * FULL RESET / ACCOUNT DELETION
+   * ---------------------------------------------------
+   *
+   * Unlike normal sign-out this intentionally
+   * removes persisted PIN and biometric data.
+   */
   const resetSession = async () => {
     const userId = user?.id;
 
-    /*
-     * This IS destructive cleanup.
-     *
-     * Used after account deletion or
-     * a genuine full local reset.
-     */
     if (userId) {
       await clearDeviceSecurity(userId);
     }
 
-    /*
-     * Account deletion may already have
-     * invalidated the backend session.
-     *
-     * We still need to ensure the client
-     * removes its local Supabase session.
-     */
     const { error } = await supabase.auth.signOut({
       scope: 'local',
     });
@@ -543,23 +729,31 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
       console.warn('Unable to complete remote sign out during reset:', error);
     }
 
-    /*
-     * Always reset application state even
-     * if the deleted session is already
-     * invalid server-side.
-     */
     syncSession(null);
+
     setPinCreated(false);
+
     setBiometricEnabled(false);
+
     setIsAppUnlocked(false);
+
     setResetPasswordEmail('');
+
     setResetPasswordVerified(false);
+
     setPasswordResetPreviewCode('');
-    setIsDeviceSecurityReady(true);
+
     setPasswordResetCodeExpiresAt(null);
-    setIsVerificationReady(true);
+
     setPasswordResetChallengeToken('');
+
     setPasswordResetToken('');
+
+    setIsDeviceSecurityReady(true);
+
+    setIsVerificationReady(true);
+
+    backgroundedAtRef.current = null;
   };
 
   return (
@@ -579,6 +773,7 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
 
         signIn,
         signUp,
+
         saveRegistrationPhone,
 
         startVerification,
@@ -591,21 +786,25 @@ export function AppSessionProvider({ children }: AppSessionProviderProps) {
         pinCreated,
         isAppUnlocked,
 
+        shouldRequireAppUnlock,
+
         createPin,
         verifyPin,
+
         unlockApp,
         lockApp,
+
         enableBiometrics,
 
         resetPasswordEmail,
         resetPasswordVerified,
         passwordResetPreviewCode,
+        passwordResetCodeExpiresAt,
 
         startPasswordReset,
         resendPasswordResetCode,
         verifyPasswordResetCode,
         completePasswordReset,
-        passwordResetCodeExpiresAt,
 
         signOutCurrentDevice,
         resetSession,
